@@ -52,10 +52,10 @@ namespace Chessour
             {
                 start = us == Color.White ? GenerateWhitePawnMoves(type, position, targetSquares, moveList, start)
                                           : GenerateBlackPawnMoves(type, position, targetSquares, moveList, start);
-                start = GenerateKnightMoves(position, us, targetSquares, moveList, start);
-                start = GenerateSliderMoves(position, us, targetSquares, PieceType.Bishop, occupancy, moveList, start);
-                start = GenerateSliderMoves(position, us, targetSquares, PieceType.Rook, occupancy, moveList, start);
-                start = GenerateSliderMoves(position, us, targetSquares, PieceType.Queen, occupancy, moveList, start);
+                start = GenerateKnightMoves(us, position, targetSquares, moveList, start);
+                start = GenerateSliderMoves(PieceType.Bishop, us, position, targetSquares, occupancy, moveList, start);
+                start = GenerateSliderMoves(PieceType.Rook, us, position, targetSquares, occupancy, moveList, start);
+                start = GenerateSliderMoves(PieceType.Queen, us, position, targetSquares, occupancy, moveList, start);
             }
 
             //King moves
@@ -259,7 +259,7 @@ namespace Chessour
             }
             return start;
         }
-        private static int GenerateKnightMoves(Position position, Color us, Bitboard targetSquares, Span<MoveScore> moveList, int start)
+        private static int GenerateKnightMoves(Color us, Position position, Bitboard targetSquares, Span<MoveScore> moveList, int start)
         {
             Bitboard knights = position.Pieces(us, PieceType.Knight);
 
@@ -272,7 +272,7 @@ namespace Chessour
             }
             return start;
         }
-        private static int GenerateSliderMoves(Position position, Color us, Bitboard targetSquares, PieceType pt, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
+        private static int GenerateSliderMoves(PieceType pt, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
         {
             Bitboard sliders = position.Pieces(us, pt);
 
