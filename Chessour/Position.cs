@@ -506,6 +506,7 @@ namespace Chessour
             state = state.Previous;
         }
 
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void SetPieceAt(Piece p, Square s)
         {
@@ -562,7 +563,6 @@ namespace Chessour
             SetPieceAt(MakePiece(us, King), undo ? kfrom : kto);
             SetPieceAt(MakePiece(us, Rook), undo ? rfrom : rto);
         }
-
         void SetCheckInfo(StateInfo si)
         {
             (si.BlockersForKing[(int)White], si.Pinners[(int)Black]) = CalculateBlockers(KingSquare(White), Pieces(Black));
@@ -576,7 +576,6 @@ namespace Chessour
             si.CheckSquares[(int)Queen] = si.CheckSquares[(int)Bishop] | si.CheckSquares[(int)Rook];
             si.CheckSquares[(int)King] = 0;
         }
-
         void SetState(StateInfo si)
         {
             si.ZobristKey = 0ul;
@@ -598,7 +597,6 @@ namespace Chessour
 
             si.ZobristKey ^= Zobrist.CastlingKey(CastlingRights);
         }
-
         (Bitboard Blockers, Bitboard Pinners) CalculateBlockers(Square target, Bitboard attackers)
         {
             Bitboard blockers = 0;

@@ -11,11 +11,14 @@ namespace Chessour.Types
 
     public static class ColorExtensions
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Color Opposite(this Color color) => (Color)((int)color ^ (int)Color.Black);
+        public static Color Opposite(this Color color)
+        {
+            return (Color)((int)color ^ (int)Color.Black);
+        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Direction PawnPush(this Color side) => side == Color.White ? Direction.North : Direction.South;
+        public static Direction PawnPush(this Color side)
+        {
+            return Direction.North - (16 * (int)side);
+        }
     }
-
 }

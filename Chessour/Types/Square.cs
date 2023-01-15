@@ -24,50 +24,38 @@ namespace Chessour.Types
             return square >= Square.a1 && square <= Square.h8;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square RelativeTo(this Square square, Color side)
         {
-            return square ^ (side == Color.White ? 0 : Square.a8);
+            return square ^ (Square)(56 * (int)side);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square FlipRank(this Square square)
         {
             return square ^ Square.a8;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square Shift(this Square square, Direction direction)
         {
             return square + (int)direction;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square NegativeShift(this Square square, Direction direction)
         {
             return square - (int)direction;
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static File FileOf(this Square square)
         {
             return (File)((int)square & 7);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int EdgeDistance(this File file)
         {
             return Math.Min((int)file, (int)File.h - (int)file);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int EdgeDistance(this Rank rank)
         {
             return Math.Min((int)rank, (int)Rank.R8 - (int)rank);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Rank RankOf(this Square square)
         {
             return (Rank)((int)square >> 3);
         }
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ToBitboard(this Square square)
         {
             return Factory.MakeBitboard(square);
@@ -76,7 +64,6 @@ namespace Chessour.Types
 
     public static partial class Factory
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square MakeSquare(File file, Rank rank)
         {
             return (Square)(((int)rank << 3) | (int)file);

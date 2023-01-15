@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Numerics;
-using System.Runtime.CompilerServices;
 
 namespace Chessour.Types
 {
@@ -30,15 +29,12 @@ namespace Chessour.Types
 
     public static class BitboardExtensions
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard SafeStep(this Square square, Direction direction)
         {
             Square to = square.Shift(direction);
 
             return to.IsValid() && Bitboards.Distance(square, to) <= 2 ? to.ToBitboard() : Bitboard.Empty;
         }
-
-
         public static Bitboard Shift(this Bitboard bitboard, Direction direction) => direction switch
         {
             Direction.North => bitboard.ShiftNorth(),
@@ -53,47 +49,23 @@ namespace Chessour.Types
             _ => throw new InvalidOperationException()
         };
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorth(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 8);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouth(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 8);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorthEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorthWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouthEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouthWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool MoreThanOne(this Bitboard bitboard) => (bitboard & (bitboard - 1)) != 0;
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square LeastSignificantSquare(this Bitboard bitboard) => (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
         public static Bitboard LeastSignificantSquareBitboard(this Bitboard bitboard) => bitboard ^ (bitboard - 1);
     }
 
     public static partial class Factory
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard MakeBitboard(Square square) => (Bitboard)(1ul << (int)square);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard MakeBitboard(File file) => (Bitboard)((ulong)Bitboard.FileA << (int)file);
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard MakeBitboard(Rank rank) => (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
     }
 }

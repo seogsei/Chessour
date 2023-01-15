@@ -120,31 +120,31 @@ namespace Chessour
                 searchStack[i] = new();
             }
         }
-        public ulong Perft(Position position, int depth, bool divide = true)
+        public ulong Perft(Position position, int depth, bool root = true)
         {
-            static bool IsLeaf(int depth) => depth == 2;
+            bool leaf = depth == 2;
 
-            ulong branchNodes, nodes = 0;
+            ulong nodes = 0;
             Position.StateInfo state = stateInfos.Pop();
 
-            MoveList moves = new(position, stackalloc MoveScore[MoveList.MaxMoveCount]);
-
-            foreach (Move m in moves)
+            foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]))
             {
-                if (divide && depth <= 1)
+                ulong branchNodes;
+
+                if (root && depth <= 1)
                     nodes += branchNodes = 1;
 
                 else
                 {
                     position.MakeMove(m, state);
 
-                    branchNodes = IsLeaf(depth) ? (ulong)new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]).Count
+                    nodes += branchNodes = leaf ? (ulong)new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]).Count
                                                 : Perft(position, depth - 1, false);
 
-                    nodes += branchNodes;
                     position.Takeback();
                 }
-                if (divide)
+
+                if (root)
                     Console.WriteLine($"{UCI.ToString(m)}: {branchNodes}");
             }
 
@@ -175,7 +175,6 @@ namespace Chessour
 
             if (!root)
             {
-
                 //Mate distance pruning
                 alpha = (Value)Math.Max((int)MatedIn(ply), (int)alpha);
                 beta = (Value)Math.Min((int)MateIn(ply + 1), (int)beta);

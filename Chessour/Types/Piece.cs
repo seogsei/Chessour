@@ -34,19 +34,27 @@ namespace Chessour.Types
 
     public static class PieceExtensions
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static PieceType TypeOf(this Piece piece) => (PieceType)((int)piece & 7);
+        public static PieceType TypeOf(this Piece piece)
+        {
+            return (PieceType)((int)piece & 7);
+        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Color ColorOf(this Piece piece) => (Color)((int)piece >> 3);
+        public static Color ColorOf(this Piece piece)
+        {
+            return (Color)((int)piece >> 3);
+        }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Piece Opposite(this Piece piece) => (Piece)((int)piece ^ 8);
+        public static Piece Opposite(this Piece piece)
+        {
+            return (Piece)((int)piece ^ 8);
+        }
     }
 
     public static partial class Factory
     {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Piece MakePiece(Color color, PieceType pieceType) => (Piece)(((int)color << 3) | (int)pieceType);
+        public static Piece MakePiece(Color color, PieceType pieceType)
+        {
+            return (Piece)(((int)color << 3) | (int)pieceType);
+        }
     }
 }

@@ -26,7 +26,7 @@ namespace Chessour.Types
     {
         public static CastlingRight MakeCastlingRight(Color us, CastlingRight cr)
         {
-            return cr & (us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide);
+            return cr & (CastlingRight)((int)CastlingRight.WhiteSide << (2 * (int)us));
         }
     }
 }
