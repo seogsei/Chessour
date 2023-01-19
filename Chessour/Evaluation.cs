@@ -1,7 +1,6 @@
-﻿using System;
+﻿using Chessour.Types;
+using System;
 using System.Text;
-using Chessour.Types;
-using static Chessour.Types.Factory;
 using static Chessour.Bitboards;
 using static Chessour.Types.PieceType;
 using static Chessour.Types.Value;
@@ -20,13 +19,13 @@ namespace Chessour
                 NB,
             }
 
-            readonly static Score[,] scores = new Score[(int)Term.NB, (int)Color.NB]; 
-            
+            readonly static Score[,] scores = new Score[(int)Term.NB, (int)Color.NB];
+
             public static void Clear()
             {
                 Array.Clear(scores);
             }
-           
+
             public static void Add(Term term, Color side, Score score)
             {
                 scores[(int)term, (int)side] = score;
@@ -36,12 +35,12 @@ namespace Chessour
             {
                 return string.Format("{0,5:N2} {1,5:N2}", ToPawnValue(score.MidGame), ToPawnValue(score.EndGame));
             }
-           
+
             private static string ToString(Term term)
             {
                 string str;
 
-                if (term == Term.Material ||term == Term.Total)
+                if (term == Term.Material || term == Term.Total)
                     str = string.Join(" | ", "----- -----", "----- -----");
                 else
                     str = string.Join(" | ", ToString(scores[(int)term, (int)Color.White]), ToString(scores[(int)term, (int)Color.Black]));
@@ -83,7 +82,7 @@ namespace Chessour
             Array.Empty<Score>(),
             new Score[9] {S(-70,-80), //Knight
                             S(-53,-55), S(-12,-10), S(-2,-17), S(3,5), S(10,15),
-                            S(25,20), S(38,25), S(45,30) }, 
+                            S(25,20), S(38,25), S(45,30) },
             new Score[14] {S(-45,-59), //Bishop
                             S(-20,-25), S(14,-8), S(29,5), S(40,20), S(50,42),
                             S(60,58), S(62,65), S(68,72), S(75,78), S(83,78),
@@ -222,7 +221,7 @@ namespace Chessour
             Value v = TaperedEval(score, position, trace);
             return position.ActiveColor == Color.White ? v : v.Negate();
         }
-        
+
 
         private static Score PieceMobility(Color side, Position pos, bool trace)
         {
@@ -234,7 +233,7 @@ namespace Chessour
 
             Square ksq = pos.KingSquare(side);
 
-            for(PieceType pt = Knight; pt < King; pt++)
+            for (PieceType pt = Knight; pt < King; pt++)
             {
                 Bitboard pieces = pos.Pieces(side, pt);
 
@@ -254,7 +253,7 @@ namespace Chessour
             {
                 Trace.Add(Trace.Term.Mobility, side, score);
             }
-                
+
 
             return score;
         }
@@ -266,11 +265,11 @@ namespace Chessour
 
             Phase phase = Phase.Total;
 
-            phase -= (position.PieceCount(MakePiece(Color.White, Pawn)) + position.PieceCount(MakePiece(Color.Black, Pawn)))  * (int)Phase.Pawn;
-            phase -= (position.PieceCount(MakePiece(Color.White, Knight)) + position.PieceCount(MakePiece(Color.Black, Knight)))  * (int)Phase.Knight;
-            phase -= (position.PieceCount(MakePiece(Color.White, Bishop)) + position.PieceCount(MakePiece(Color.Black, Bishop)))  * (int)Phase.Bishop;
-            phase -= (position.PieceCount(MakePiece(Color.White, Rook)) + position.PieceCount(MakePiece(Color.Black, Rook)))  * (int)Phase.Rook;
-            phase -= (position.PieceCount(MakePiece(Color.White, Queen)) + position.PieceCount(MakePiece(Color.Black, Queen)))  * (int)Phase.Queen;         
+            phase -= (position.PieceCount(MakePiece(Color.White, Pawn)) + position.PieceCount(MakePiece(Color.Black, Pawn))) * (int)Phase.Pawn;
+            phase -= (position.PieceCount(MakePiece(Color.White, Knight)) + position.PieceCount(MakePiece(Color.Black, Knight))) * (int)Phase.Knight;
+            phase -= (position.PieceCount(MakePiece(Color.White, Bishop)) + position.PieceCount(MakePiece(Color.Black, Bishop))) * (int)Phase.Bishop;
+            phase -= (position.PieceCount(MakePiece(Color.White, Rook)) + position.PieceCount(MakePiece(Color.Black, Rook))) * (int)Phase.Rook;
+            phase -= (position.PieceCount(MakePiece(Color.White, Queen)) + position.PieceCount(MakePiece(Color.Black, Queen))) * (int)Phase.Queen;
 
             phase = (Phase)(((int)phase * 256 + ((int)Phase.Total / 2)) / (int)Phase.Total);
 

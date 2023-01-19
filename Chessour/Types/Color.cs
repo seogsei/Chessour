@@ -1,6 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-
-namespace Chessour.Types
+﻿namespace Chessour.Types
 {
     public enum Color
     {

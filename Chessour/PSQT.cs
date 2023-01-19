@@ -1,5 +1,5 @@
-﻿using System;
-using Chessour.Types;
+﻿using Chessour.Types;
+using System;
 
 namespace Chessour
 {
@@ -107,7 +107,7 @@ namespace Chessour
         static PSQT()
         {
             Span<Piece> pieces = stackalloc Piece[] { Piece.WhitePawn, Piece.WhiteKnight, Piece.WhiteBishop, Piece.WhiteRook, Piece.WhiteQueen, Piece.WhiteKing };
-            
+
             foreach (Piece pc in pieces)
             {
                 Score pieceScore = Evaluation.PieceValue(pc);
@@ -118,7 +118,7 @@ namespace Chessour
                                                                                                      : bonuses[(int)pc][(int)s.RankOf()][s.FileOf().EdgeDistance()]);
 
                     psqt[(int)pc.Opposite(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
-                
+
                 }
             }
         }

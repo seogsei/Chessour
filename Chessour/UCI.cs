@@ -3,11 +3,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using static Chessour.Types.Factory;
 
 namespace Chessour
 {
-    class UCI
+    static class UCI
     {
         public const int NormalizeToPawn = (int)Value.PawnMG;
 
@@ -102,6 +101,7 @@ namespace Chessour
                     return;
             }
         }
+
         private static void Go(IEnumerator<string> enumerator, Position position)
         {
             SearchContext.SearchLimits limits = new();
@@ -127,6 +127,7 @@ namespace Chessour
 
             Engine.Threads.StartThinking(position, limits, ponder);
         }
+
         private static void Bench(IEnumerator<string> enumerator, Position position)
         {
             ulong nodes = 0;
@@ -153,6 +154,7 @@ namespace Chessour
             Console.WriteLine($"Nodes searched : {nodes}");
             Console.WriteLine($"Nps : {1000 * nodes / (ulong)elapsed}");
         }
+      
         private static void Eval(Position position)
         {
             Evaluation.Evaluate(position, true);
@@ -174,6 +176,7 @@ namespace Chessour
 
             return sb.ToString();
         }
+
         public static Move ParseMove(Position position, string str)
         {
             MoveList moveList = new(position, stackalloc MoveScore[MoveList.MaxMoveCount]);
@@ -184,6 +187,7 @@ namespace Chessour
 
             return Move.None;
         }
+
         public static string ToString(Move m)
         {
             Square from = m.FromSquare();
@@ -204,6 +208,7 @@ namespace Chessour
 
             return move;
         }
+
         public static string ToString(Value v)
         {
             StringBuilder sb = new();

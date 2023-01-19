@@ -56,14 +56,14 @@ namespace Chessour.Types
         {
             return new(b);
         }
-       
+
         public static Bitboard SafeStep(this Square square, Direction direction)
         {
             Square to = square.Shift(direction);
 
             return to.IsValid() && Bitboards.Distance(square, to) <= 2 ? to.ToBitboard() : 0;
         }
-       
+
         public static Bitboard Shift(this Bitboard bitboard, Direction direction)
         {
             return direction switch
@@ -80,12 +80,12 @@ namespace Chessour.Types
                 _ => throw new InvalidOperationException()
             };
         }
- 
+
         public static Bitboard ShiftNorth(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard << 8);
         }
-        
+
         public static Bitboard ShiftSouth(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard >> 8);
@@ -144,7 +144,7 @@ namespace Chessour.Types
 
             return square;
         }
-        
+
         public static int PopulationCount(this Bitboard bitboard)
         {
             return BitOperations.PopCount((ulong)bitboard);

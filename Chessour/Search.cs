@@ -1,7 +1,6 @@
 ﻿using Chessour.Types;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using static Chessour.SearchContext;
 using static Chessour.Types.ValueUtills;
 
@@ -177,7 +176,7 @@ namespace Chessour
                 alpha = (Value)Math.Max((int)MatedIn(ply), (int)alpha);
                 beta = (Value)Math.Min((int)MateIn(ply + 1), (int)beta);
                 if (alpha >= beta)
-                    return alpha;               
+                    return alpha;
             }
 
             int moveCount;

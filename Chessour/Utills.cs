@@ -1,9 +1,4 @@
-﻿using Chessour.Types;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System;
 
 namespace Chessour
 {
@@ -16,9 +11,9 @@ namespace Chessour
                 return (ulong)random.NextInt64();
             }
         }
-        public static ulong SparseUInt64(this Random random) 
+        public static ulong SparseUInt64(this Random random)
         {
             return random.NextUInt64() & random.NextUInt64() & random.NextUInt64();
         }
-    }    
+    }
 }

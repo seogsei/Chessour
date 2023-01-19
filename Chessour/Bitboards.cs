@@ -1,7 +1,6 @@
-﻿using System;
+﻿using Chessour.Types;
+using System;
 using System.Numerics;
-using Chessour.Types;
-using static Chessour.Types.Bitboard;
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
 using static Chessour.Types.PieceType;

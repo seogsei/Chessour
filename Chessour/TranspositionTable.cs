@@ -13,10 +13,10 @@ namespace Chessour
 
     struct TTEntry
     {
-        Key key; 
-        byte depth; 
-        byte gen8; 
-        ushort move; 
+        Key key;
+        byte depth;
+        byte gen8;
+        ushort move;
         short eval;
 
         public Key Key { get => key; }

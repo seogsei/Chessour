@@ -1,6 +1,4 @@
-﻿using System.Diagnostics;
-
-namespace Chessour
+﻿namespace Chessour
 {
     class Engine
     {

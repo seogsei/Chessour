@@ -37,7 +37,7 @@ namespace Chessour
 
             return end;
         }
-               
+
         public static int Generate(GenerationType type, Position position, Span<MoveScore> moveList, int start = 0)
         {
             Color us = position.ActiveColor;
@@ -77,7 +77,7 @@ namespace Chessour
 
             return start;
         }
-        
+
         private static int GeneratePromotions(GenerationType type, Square from, Square to, Span<MoveScore> moveList, int start)
         {
             if (type == Captures || type == Evasions || type == NonEvasions)
@@ -92,7 +92,7 @@ namespace Chessour
 
             return start;
         }
-       
+
         private static int GenerateWhitePawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
         {
             const Color us = Color.White;
@@ -177,7 +177,7 @@ namespace Chessour
             }
             return start;
         }
-        
+
         private static int GenerateBlackPawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
         {
             const Color us = Color.Black;
@@ -262,16 +262,16 @@ namespace Chessour
             }
             return start;
         }
-        
+
         private static int GenerateKnightMoves(Color us, Position position, Bitboard targetSquares, Span<MoveScore> moveList, int start)
         {
-            foreach (Square knightSqr in position.Pieces(us, PieceType.Knight))          
+            foreach (Square knightSqr in position.Pieces(us, PieceType.Knight))
                 foreach (Square attack in Attacks(PieceType.Knight, knightSqr) & targetSquares)
                     moveList[start++] = MakeMove(knightSqr, attack);
-            
+
             return start;
         }
-        
+
         private static int GeneratePieceMoves(PieceType pt, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
         {
             foreach (Square pieces in position.Pieces(us, pt))

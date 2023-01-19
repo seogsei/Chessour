@@ -1,6 +1,5 @@
 ﻿using Chessour.Types;
 using System.Text;
-using static Chessour.Types.Factory;
 
 namespace Chessour
 {

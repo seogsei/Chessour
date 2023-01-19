@@ -1,11 +1,8 @@
 ﻿using Chessour.Types;
 using System;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using static Chessour.Bitboards;
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
-using static Chessour.Types.Factory;
 using static Chessour.Types.PieceType;
 
 
