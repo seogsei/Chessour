@@ -124,13 +124,11 @@ namespace Chessour
         {
             bool leaf = depth == 2;
 
-            ulong nodes = 0;
-            Position.StateInfo state = stateInfos.Pop();
+            ulong branchNodes, nodes = 0;
+            var state = stateInfos.Pop();
 
             foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]))
             {
-                ulong branchNodes;
-
                 if (root && depth <= 1)
                     nodes += branchNodes = 1;
 

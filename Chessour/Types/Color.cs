@@ -11,6 +11,11 @@ namespace Chessour.Types
 
     public static class ColorExtensions
     {
+        public static bool IsValid(this Color color)
+        {
+            return color == Color.White || color == Color.Black;
+        }
+
         public static Color Opposite(this Color color)
         {
             return (Color)((int)color ^ (int)Color.Black);

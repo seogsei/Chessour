@@ -1,4 +1,6 @@
 ﻿using Chessour.Types;
+using System;
+using System.Runtime.InteropServices;
 
 namespace Chessour
 {
@@ -11,10 +13,10 @@ namespace Chessour
 
     struct TTEntry
     {
-        Key key;
-        byte depth;
-        ushort move;
-        byte gen8;
+        Key key; 
+        byte depth; 
+        byte gen8; 
+        ushort move; 
         short eval;
 
         public Key Key { get => key; }
@@ -44,7 +46,19 @@ namespace Chessour
         static TranspositionTable()
         {
             entries = new TTEntry[1 << 16];
-            shift = 48;
+            shift = 64 - 16;
+        }
+
+        public static void Resize(int sizeInMB)
+        {
+            if (sizeInMB < 0)
+                return;
+
+            int entryCount = sizeInMB * 1024 * 1024 / Marshal.SizeOf(typeof(TTEntry));
+        }
+        public static void Clear()
+        {
+            Array.Clear(entries);
         }
 
         public static ref TTEntry ProbeTT(Key key, out bool found)

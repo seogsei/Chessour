@@ -17,7 +17,6 @@ namespace Chessour
             public Bitboard[] BlockersForKing { get; } = new Bitboard[(int)Color.NB];
             public Bitboard[] Pinners { get; } = new Bitboard[(int)Color.NB];
             public Bitboard[] CheckSquares { get; } = new Bitboard[(int)PieceType.NB];
-
         }
     }
 }

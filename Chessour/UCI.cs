@@ -33,9 +33,12 @@ namespace Chessour
                         Engine.Threads.Stop = true;
                         break;
                     case "uci":
-                        Console.WriteLine("id name " + Engine.Name);
-                        Console.WriteLine("id author " + Engine.Author);
-                        Console.WriteLine("uciok");
+                        const string uciString = $"""
+                                                id name {Engine.Name}
+                                                id author {Engine.Author}
+                                                uciok
+                                                """;
+                        Console.WriteLine(uciString);
                         break;
                     case "go":
                         Go(enumerator, position);
@@ -134,10 +137,10 @@ namespace Chessour
 
             if (token == "go")
             {
-                Console.WriteLine();
-                Console.WriteLine($"Position ({position.FEN()})");
+                Console.WriteLine($"\nPosition ({position.FEN()})");
 
                 Go(enumerator, position);
+
                 Engine.Threads.WaitForSeachFinish();
                 nodes += Engine.Threads.NodesSearched();
             }
@@ -146,9 +149,9 @@ namespace Chessour
             elapsed = Engine.Now() - elapsed + 1;
 
             Console.WriteLine();
-            Console.WriteLine("Total time (ms) : " + elapsed);
-            Console.WriteLine("Nodes searched : " + nodes);
-            Console.WriteLine("Nps : " + 1000 * nodes / (ulong)elapsed);
+            Console.WriteLine($"Total time (ms) : {elapsed}");
+            Console.WriteLine($"Nodes searched : {nodes}");
+            Console.WriteLine($"Nps : {1000 * nodes / (ulong)elapsed}");
         }
         private static void Eval(Position position)
         {
@@ -178,6 +181,7 @@ namespace Chessour
             foreach (Move m in moveList)
                 if (str == ToString(m))
                     return m;
+
             return Move.None;
         }
         public static string ToString(Move m)

@@ -1,16 +1,10 @@
-﻿using Chessour.Types;
-using System;
-using static Chessour.Types.Piece;
+﻿using System;
+using Chessour.Types;
 
 namespace Chessour
 {
     static class PSQT
     {
-        static Score S(int mg, int eg) => new(mg, eg);
-        static Score S(Value mg, Value eg) => new(mg, eg);
-
-        public static void Init() { }
-
 
         static readonly Score[][][] bonuses = new Score[(int)PieceType.NB][][]
         {
@@ -96,22 +90,34 @@ namespace Chessour
             },
         };
 
-        static Score[,] pieceSquareTables = new Score[(int)Piece.NB, (int)Square.NB];
-        public static Score Get(Piece pc, Square s) => pieceSquareTables[(int)pc, (int)s];
+        static readonly Score[,] psqt = new Score[(int)Piece.NB, (int)Square.NB];
+
+        public static Score Get(Piece pc, Square s)
+        {
+            return psqt[(int)pc, (int)s];
+        }
+
+        static Score S(int mg, int eg)
+        {
+            return new(mg, eg);
+        }
+
+        public static void Init() { }
 
         static PSQT()
         {
-            Span<Piece> pieces = stackalloc Piece[] { WhitePawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing };
+            Span<Piece> pieces = stackalloc Piece[] { Piece.WhitePawn, Piece.WhiteKnight, Piece.WhiteBishop, Piece.WhiteRook, Piece.WhiteQueen, Piece.WhiteKing };
+            
             foreach (Piece pc in pieces)
             {
                 Score pieceScore = Evaluation.PieceValue(pc);
 
                 for (Square s = Square.a1; s <= Square.h8; s++)
                 {
-                    pieceSquareTables[(int)pc, (int)s] = pieceScore + (pc.TypeOf() == PieceType.Pawn ? bonuses[(int)pc][(int)s.RankOf()][(int)s.FileOf()]
+                    psqt[(int)pc, (int)s] = pieceScore + (pc.TypeOf() == PieceType.Pawn ? bonuses[(int)pc][(int)s.RankOf()][(int)s.FileOf()]
                                                                                                      : bonuses[(int)pc][(int)s.RankOf()][s.FileOf().EdgeDistance()]);
 
-                    pieceSquareTables[(int)pc.Opposite(), (int)s.FlipRank()] = -pieceSquareTables[(int)pc, (int)s];
+                    psqt[(int)pc.Opposite(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
                 
                 }
             }

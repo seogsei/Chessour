@@ -5,9 +5,9 @@
         public static void Main(string[] args)
         {
             Bitboards.Init();
-            Position.Init();
+            Zobrist.Init();
             PSQT.Init();
-            Evaluation.Init();
+            Evaluation.Init();           
 
             UCI.Run(args);
 

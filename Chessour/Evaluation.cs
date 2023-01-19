@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Text;
 using Chessour.Types;
-
 using static Chessour.Types.Factory;
 using static Chessour.Bitboards;
 using static Chessour.Types.PieceType;
@@ -21,12 +20,13 @@ namespace Chessour
                 NB,
             }
 
-            static Score[,] scores = new Score[(int)Term.NB, (int)Color.NB]; 
+            readonly static Score[,] scores = new Score[(int)Term.NB, (int)Color.NB]; 
             
             public static void Clear()
             {
                 Array.Clear(scores);
             }
+           
             public static void Add(Term term, Color side, Score score)
             {
                 scores[(int)term, (int)side] = score;
@@ -36,6 +36,7 @@ namespace Chessour
             {
                 return string.Format("{0,5:N2} {1,5:N2}", ToPawnValue(score.MidGame), ToPawnValue(score.EndGame));
             }
+           
             private static string ToString(Term term)
             {
                 string str;
@@ -245,7 +246,7 @@ namespace Chessour
                     if ((blockersForKing & pieceSquare.ToBitboard()) != 0)
                         attacks &= Line(ksq, pieceSquare);
 
-                    score += pieceMobility[(int)pt][PopCount(attacks)];
+                    score += pieceMobility[(int)pt][attacks.PopulationCount()];
                 }
             }
 

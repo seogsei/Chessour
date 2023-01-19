@@ -34,6 +34,11 @@ namespace Chessour.Types
 
     public static class PieceExtensions
     {
+        public static bool IsValid(this PieceType pieceType)
+        {
+            return pieceType >= 0 && pieceType < PieceType.NB;
+        }
+
         public static PieceType TypeOf(this Piece piece)
         {
             return (PieceType)((int)piece & 7);

@@ -27,45 +27,145 @@ namespace Chessour.Types
         Rank8 = Rank1 << (8 * 7),
     }
 
+    public struct BitboardEnumerator
+    {
+        private Bitboard bits;
+        public Square Current { get; private set; }
+
+        public BitboardEnumerator(Bitboard b)
+        {
+            bits = b;
+            Current = 0;
+        }
+
+        public bool MoveNext()
+        {
+            if (bits != 0)
+            {
+                Current = bits.PopSquare();
+                return true;
+            }
+            else
+                return false;
+        }
+    }
+
     public static class BitboardExtensions
     {
+        public static BitboardEnumerator GetEnumerator(this Bitboard b)
+        {
+            return new(b);
+        }
+       
         public static Bitboard SafeStep(this Square square, Direction direction)
         {
             Square to = square.Shift(direction);
 
-            return to.IsValid() && Bitboards.Distance(square, to) <= 2 ? to.ToBitboard() : Bitboard.Empty;
+            return to.IsValid() && Bitboards.Distance(square, to) <= 2 ? to.ToBitboard() : 0;
         }
-        public static Bitboard Shift(this Bitboard bitboard, Direction direction) => direction switch
+       
+        public static Bitboard Shift(this Bitboard bitboard, Direction direction)
         {
-            Direction.North => bitboard.ShiftNorth(),
-            Direction.South => bitboard.ShiftSouth(),
-            Direction.East => bitboard.ShiftEast(),
-            Direction.West => bitboard.ShiftWest(),
-            Direction.NorthEast => bitboard.ShiftNorthEast(),
-            Direction.NorthWest => bitboard.ShiftNorthWest(),
-            Direction.SouthEast => bitboard.ShiftSouthEast(),
-            Direction.SouthWest => bitboard.ShiftSouthWest(),
+            return direction switch
+            {
+                Direction.North => bitboard.ShiftNorth(),
+                Direction.South => bitboard.ShiftSouth(),
+                Direction.East => bitboard.ShiftEast(),
+                Direction.West => bitboard.ShiftWest(),
+                Direction.NorthEast => bitboard.ShiftNorthEast(),
+                Direction.NorthWest => bitboard.ShiftNorthWest(),
+                Direction.SouthEast => bitboard.ShiftSouthEast(),
+                Direction.SouthWest => bitboard.ShiftSouthWest(),
 
-            _ => throw new InvalidOperationException()
-        };
+                _ => throw new InvalidOperationException()
+            };
+        }
+ 
+        public static Bitboard ShiftNorth(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 8);
+        }
+        
+        public static Bitboard ShiftSouth(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 8);
+        }
 
-        public static Bitboard ShiftNorth(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 8);
-        public static Bitboard ShiftSouth(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 8);
-        public static Bitboard ShiftEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
-        public static Bitboard ShiftWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
-        public static Bitboard ShiftNorthEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
-        public static Bitboard ShiftNorthWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
-        public static Bitboard ShiftSouthEast(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
-        public static Bitboard ShiftSouthWest(this Bitboard bitboard) => (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
-        public static bool MoreThanOne(this Bitboard bitboard) => (bitboard & (bitboard - 1)) != 0;
-        public static Square LeastSignificantSquare(this Bitboard bitboard) => (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
-        public static Bitboard LeastSignificantSquareBitboard(this Bitboard bitboard) => bitboard ^ (bitboard - 1);
+        public static Bitboard ShiftEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
+        }
+
+        public static Bitboard ShiftNorthEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftNorthWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
+        }
+
+        public static Bitboard ShiftSouthEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftSouthWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
+        }
+
+        public static bool MoreThanOne(this Bitboard bitboard)
+        {
+            return (bitboard & (bitboard - 1)) != 0;
+        }
+
+        public static Square LeastSignificantSquare(this Bitboard bitboard)
+        {
+            return (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
+        }
+
+        public static Bitboard LeastSignificantSquareBitboard(this Bitboard bitboard)
+        {
+            return bitboard ^ (bitboard - 1);
+        }
+
+        public static Square PopSquare(ref this Bitboard bitboard)
+        {
+            Square square = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit
+
+            bitboard &= bitboard - 1; //Resets the least significant bit
+
+            return square;
+        }
+        
+        public static int PopulationCount(this Bitboard bitboard)
+        {
+            return BitOperations.PopCount((ulong)bitboard);
+        }
     }
 
     public static partial class Factory
     {
-        public static Bitboard MakeBitboard(Square square) => (Bitboard)(1ul << (int)square);
-        public static Bitboard MakeBitboard(File file) => (Bitboard)((ulong)Bitboard.FileA << (int)file);
-        public static Bitboard MakeBitboard(Rank rank) => (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
+        public static Bitboard MakeBitboard(Square square)
+        {
+            return (Bitboard)(1ul << (int)square);
+        }
+
+        public static Bitboard MakeBitboard(File file)
+        {
+            return (Bitboard)((ulong)Bitboard.FileA << (int)file);
+        }
+
+        public static Bitboard MakeBitboard(Rank rank)
+        {
+            return (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
+        }
     }
 }

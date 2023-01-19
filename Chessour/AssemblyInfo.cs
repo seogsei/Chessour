@@ -1,4 +1,6 @@
 global using System.Runtime.CompilerServices;
+global using System.Diagnostics;
+global using static Chessour.Types.Factory;
 
 using System.Runtime.InteropServices; 
 

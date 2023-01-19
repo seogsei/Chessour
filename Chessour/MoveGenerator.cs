@@ -2,7 +2,6 @@
 using System;
 using static Chessour.Bitboards;
 using static Chessour.GenerationType;
-using static Chessour.Types.Factory;
 
 namespace Chessour
 {
@@ -38,6 +37,7 @@ namespace Chessour
 
             return end;
         }
+               
         public static int Generate(GenerationType type, Position position, Span<MoveScore> moveList, int start = 0)
         {
             Color us = position.ActiveColor;
@@ -53,9 +53,9 @@ namespace Chessour
                 start = us == Color.White ? GenerateWhitePawnMoves(type, position, targetSquares, moveList, start)
                                           : GenerateBlackPawnMoves(type, position, targetSquares, moveList, start);
                 start = GenerateKnightMoves(us, position, targetSquares, moveList, start);
-                start = GenerateSliderMoves(PieceType.Bishop, us, position, targetSquares, occupancy, moveList, start);
-                start = GenerateSliderMoves(PieceType.Rook, us, position, targetSquares, occupancy, moveList, start);
-                start = GenerateSliderMoves(PieceType.Queen, us, position, targetSquares, occupancy, moveList, start);
+                start = GeneratePieceMoves(PieceType.Bishop, us, position, targetSquares, occupancy, moveList, start);
+                start = GeneratePieceMoves(PieceType.Rook, us, position, targetSquares, occupancy, moveList, start);
+                start = GeneratePieceMoves(PieceType.Queen, us, position, targetSquares, occupancy, moveList, start);
             }
 
             //King moves
@@ -77,6 +77,7 @@ namespace Chessour
 
             return start;
         }
+        
         private static int GeneratePromotions(GenerationType type, Square from, Square to, Span<MoveScore> moveList, int start)
         {
             if (type == Captures || type == Evasions || type == NonEvasions)
@@ -91,6 +92,7 @@ namespace Chessour
 
             return start;
         }
+       
         private static int GenerateWhitePawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
         {
             const Color us = Color.White;
@@ -175,6 +177,7 @@ namespace Chessour
             }
             return start;
         }
+        
         private static int GenerateBlackPawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
         {
             const Color us = Color.Black;
@@ -259,30 +262,21 @@ namespace Chessour
             }
             return start;
         }
+        
         private static int GenerateKnightMoves(Color us, Position position, Bitboard targetSquares, Span<MoveScore> moveList, int start)
         {
-            Bitboard knights = position.Pieces(us, PieceType.Knight);
-
-            foreach (Square knightSqr in knights)
-            {
-                Bitboard attacks = Attacks(PieceType.Knight, knightSqr) & targetSquares;
-
-                foreach (Square attack in attacks)
+            foreach (Square knightSqr in position.Pieces(us, PieceType.Knight))          
+                foreach (Square attack in Attacks(PieceType.Knight, knightSqr) & targetSquares)
                     moveList[start++] = MakeMove(knightSqr, attack);
-            }
+            
             return start;
         }
-        private static int GenerateSliderMoves(PieceType pt, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
+        
+        private static int GeneratePieceMoves(PieceType pt, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
         {
-            Bitboard sliders = position.Pieces(us, pt);
-
-            foreach (Square sliderSquare in sliders)
-            {
-                Bitboard attacks = Attacks(pt, sliderSquare, occupiedSquares) & targetSquares;
-
-                foreach (Square attack in attacks)
-                    moveList[start++] = MakeMove(sliderSquare, attack);
-            }
+            foreach (Square pieces in position.Pieces(us, pt))
+                foreach (Square attack in Attacks(pt, pieces, occupiedSquares) & targetSquares)
+                    moveList[start++] = MakeMove(pieces, attack);
 
             return start;
         }

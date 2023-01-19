@@ -2,35 +2,33 @@
 {
     class FastStack<T>
     {
-        T[] arr;
-        int pointer;
-
-        public int Count => pointer;
+        readonly T[] arr;
+        public int Count { get; private set; }
 
         public FastStack(int capacity)
         {
             arr = new T[capacity];
-            pointer = 0;
+            Count = 0;
         }
 
         public void Push(T value)
         {
-            arr[pointer++] = value;
+            arr[Count++] = value;
         }
 
         public T Pop()
         {
-            return arr[--pointer];
+            return arr[--Count];
         }
 
         public T Peek()
         {
-            return arr[pointer - 1];
+            return arr[Count - 1];
         }
 
         public void Clear()
         {
-            pointer = 0;
+            Count = 0;
         }
     }
 }
