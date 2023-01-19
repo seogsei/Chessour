@@ -1,6 +1,4 @@
-﻿using Chessour.Types;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
@@ -29,7 +27,7 @@ namespace Chessour
                 {
                     case "quit":
                     case "stop":
-                        Engine.Threads.Stop = true;
+                        Engine.Threads.Stop();
                         break;
                     case "uci":
                         const string uciString = $"""
@@ -104,24 +102,25 @@ namespace Chessour
 
         private static void Go(IEnumerator<string> enumerator, Position position)
         {
-            SearchContext.SearchLimits limits = new();
+            SearchObject.SearchLimits limits = new();
             bool ponder = false;
 
             while (enumerator.MoveNext())
                 switch (enumerator.Current)
                 {
                     case "searchmoves":
+                        limits.searchMoves = new();
                         while (enumerator.MoveNext())
-                            limits.SearchMoves.Add(ParseMove(position, enumerator.Current));
+                            limits.searchMoves.Add(ParseMove(position, enumerator.Current));
                         break;
                     case "ponder":
                         ponder = true;
                         break;
                     case "depth":
-                        limits.Depth = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
+                        limits.depth = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
                         break;
                     case "perft":
-                        limits.Perft = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
+                        limits.perft = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
                         break;
                 }
 
@@ -179,7 +178,7 @@ namespace Chessour
 
         public static Move ParseMove(Position position, string str)
         {
-            MoveList moveList = new(position, stackalloc MoveScore[MoveList.MaxMoveCount]);
+            MoveList moveList = new(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
 
             foreach (Move m in moveList)
                 if (str == ToString(m))
@@ -200,7 +199,7 @@ namespace Chessour
                 return "0000";
 
             if (m.TypeOf() == MoveType.Castling)
-                to = MakeSquare(to > from ? File.g : File.c, from.RankOf());
+                to = MakeSquare(to > from ? File.g : File.c, from.GetRank());
 
             string move = string.Concat(from, to);
             if (m.TypeOf() == MoveType.Promotion)

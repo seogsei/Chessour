@@ -1,4 +1,4 @@
-﻿namespace Chessour.Types
+﻿namespace Chessour
 {
     public struct MoveScore
     {

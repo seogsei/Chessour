@@ -1,15 +1,18 @@
-﻿namespace Chessour
+﻿using System;
+
+namespace Chessour
 {
-    class Engine
+    static class Engine
     {
         public const string Name = "Chessour";
         public const string Author = "Muhammed İkbal Yaman";
+        public static SearchPool Threads { get; }
 
         readonly static Stopwatch timer;
-        public static SearchPool Threads { get; }
 
         public static long Now() => timer.ElapsedMilliseconds;
 
+        public static void Init() { }
 
         static Engine()
         {

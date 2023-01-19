@@ -1,8 +1,6 @@
-﻿using System;
-
-namespace Chessour
+﻿namespace Chessour.Types
 {
-    public static class RandomExtensions
+    public static partial class CoreFunctions
     {
         public static ulong NextUInt64(this Random random)
         {

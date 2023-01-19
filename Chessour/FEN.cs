@@ -1,5 +1,4 @@
-﻿using Chessour.Types;
-using System.Text;
+﻿using System.Text;
 
 namespace Chessour
 {

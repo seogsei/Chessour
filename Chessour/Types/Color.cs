@@ -2,12 +2,10 @@
 {
     public enum Color
     {
-        White,
-        Black,
-        NB
+        White, Black, NB
     }
 
-    public static class ColorExtensions
+    public static partial class CoreFunctions
     {
         public static bool IsValid(this Color color)
         {
@@ -19,7 +17,7 @@
             return (Color)((int)color ^ (int)Color.Black);
         }
 
-        public static Direction PawnPush(this Color side)
+        public static Direction PawnPush(Color side)
         {
             return Direction.North - (16 * (int)side);
         }

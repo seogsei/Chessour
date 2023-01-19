@@ -1,6 +1,4 @@
-﻿using Chessour.Types;
-
-namespace Chessour
+﻿namespace Chessour
 {
     public interface IPositionInfo
     {

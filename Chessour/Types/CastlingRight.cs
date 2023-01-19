@@ -1,10 +1,6 @@
-﻿using System;
-
-namespace Chessour.Types
+﻿namespace Chessour.Types
 {
-
-    [Flags]
-    public enum CastlingRight : byte
+    public enum CastlingRight
     {
         None = 0,
         WhiteKingSide = 1,
@@ -22,11 +18,11 @@ namespace Chessour.Types
         NB
     }
 
-    public static partial class Factory
+    public static partial class CoreFunctions
     {
-        public static CastlingRight MakeCastlingRight(Color us, CastlingRight cr)
+        public static CastlingRight MakeCastlingRight(Color side, CastlingRight cr)
         {
-            return cr & (CastlingRight)((int)CastlingRight.WhiteSide << (2 * (int)us));
+            return cr & (CastlingRight)((int)CastlingRight.WhiteSide << (2 * (int)side));
         }
     }
 }

@@ -1,10 +1,8 @@
-﻿using Chessour.Types;
-using System;
+﻿using System.Xml;
 using static Chessour.Bitboards;
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
 using static Chessour.Types.PieceType;
-
 
 namespace Chessour
 {
@@ -12,16 +10,18 @@ namespace Chessour
     {
         public static void Init() { Zobrist.Init(); }
 
-
         readonly Piece[] board = new Piece[(int)Square.NB];
-        readonly Bitboard[] typeBB = new Bitboard[(int)PieceType.NB];
-        readonly Bitboard[] colorBB = new Bitboard[(int)Color.NB];
-        readonly int[] pieceCount = new int[(int)Piece.NB];
+        readonly Bitboard[] colorBitboards = new Bitboard[(int)Color.NB];
+        readonly Bitboard[] typeBitboards = new Bitboard[(int)PieceType.NB];
+        readonly int[] pieceCounts = new int[(int)Piece.NB];
+        Score materialScore;
+
         readonly CastlingRight[] castlingRightMask = new CastlingRight[(int)Square.NB];
         readonly Square[] castlingRookSquare = new Square[(int)CastlingRight.NB];
         readonly Bitboard[] castlingPath = new Bitboard[(int)CastlingRight.NB];
-        Score materialScore;
+
         Color activeColor;
+
         StateInfo state;
         int gamePly;
 
@@ -38,36 +38,35 @@ namespace Chessour
 
         public Piece PieceAt(Square s)
         {
-            Debug.Assert(s.IsValid());
             return board[(int)s];
         }
         public Square KingSquare(Color c)
         {
-            return (colorBB[(int)c] & typeBB[(int)King]).LeastSignificantSquare();
+            return (colorBitboards[(int)c] & typeBitboards[(int)King]).LeastSignificantSquare();
         }
         public Bitboard Pieces()
         {
-            return colorBB[(int)White] | colorBB[(int)Black];
+            return typeBitboards[(int)AllPieces];
         }
         public Bitboard Pieces(Color c)
         {
-            return colorBB[(int)c];
+            return colorBitboards[(int)c];
         }
         public Bitboard Pieces(PieceType pt)
         {
-            return typeBB[(int)pt];
+            return typeBitboards[(int)pt];
         }
         public Bitboard Pieces(PieceType pt1, PieceType pt2)
         {
-            return (typeBB[(int)pt1] | typeBB[(int)pt2]);
+            return (typeBitboards[(int)pt1] | typeBitboards[(int)pt2]);
         }
         public Bitboard Pieces(Color c, PieceType pt)
         {
-            return colorBB[(int)c] & typeBB[(int)pt];
+            return colorBitboards[(int)c] & typeBitboards[(int)pt];
         }
         public Bitboard Pieces(Color c, PieceType pt1, PieceType pt2)
         {
-            return colorBB[(int)c] & (typeBB[(int)pt1] | typeBB[(int)pt2]);
+            return colorBitboards[(int)c] & (typeBitboards[(int)pt1] | typeBitboards[(int)pt2]);
         }
         public Bitboard AttackersTo(Square s)
         {
@@ -96,7 +95,7 @@ namespace Chessour
         }
         public int PieceCount(Piece pc)
         {
-            return pieceCount[(int)pc];
+            return pieceCounts[(int)pc];
         }
         public bool IsCheck()
         {
@@ -112,46 +111,46 @@ namespace Chessour
             if (m.TypeOf() != MoveType.Quiet)
                 return new MoveList(IsCheck() ? GenerationType.Evasions : GenerationType.NonEvasions,
                                     this,
-                                    stackalloc MoveScore[MoveList.MaxMoveCount]).Contains(m);
+                                    stackalloc MoveScore[MoveGenerator.MaxMoveCount]).Contains(m);
 
-            if ((Pieces(us) & MakeBitboard(to)) != 0)
+            if ((Pieces(us) & to.ToBitboard()) != 0)
                 return false;
 
-            if (pc == Piece.None || pc.ColorOf() != us)
+            if (pc == Piece.None || pc.GetColor() != us)
                 return false;
 
             if (m.PromotionPiece() != Knight)
                 return false;
 
 
-            if (pc.TypeOf() == Pawn)
+            if (CoreFunctions.GetPieceType(pc) == Pawn)
             {
                 if (((Bitboard.Rank8 | Bitboard.Rank1) & to.ToBitboard()) != 0)
                     return false;
 
                 if (!((PawnAttacks(us, from) & Pieces(us.Opposite()) & to.ToBitboard()) != 0)
-                    && !(from.Shift(us.PawnPush()) == to && PieceAt(to) == Piece.None)
-                    && !((from.Shift(us.PawnPush()).Shift(us.PawnPush()) == to)
-                            && from.RankOf().RelativeTo(us) == Rank.R2
+                    && !(from.Shift(PawnPush(us)) == to && PieceAt(to) == Piece.None)
+                    && !((from.Shift(PawnPush(us)).Shift(PawnPush(us)) == to)
+                            && from.GetRank().RelativeTo(us) == Rank.R2
                             && PieceAt(to) == Piece.None
-                            && PieceAt(to.NegativeShift(us.PawnPush())) == Piece.None))
+                            && PieceAt(to.NegativeShift(PawnPush(us))) == Piece.None))
                     return false;
             }
-            else if (((Attacks(pc.TypeOf(), from, Pieces())) & MakeBitboard(to)) == 0)
+            else if (((Attacks(CoreFunctions.GetPieceType(pc), from, Pieces())) & to.ToBitboard()) == 0)
                 return false;
 
 
             if (IsCheck())
             {
-                if (pc.TypeOf() != King)
+                if (CoreFunctions.GetPieceType(pc) != King)
                 {
                     if (Checkers.MoreThanOne())
                         return false;
 
-                    if (((Between(KingSquare(us), Checkers.LeastSignificantSquare()) | Checkers) & MakeBitboard(to)) == 0)
+                    if (((Between(KingSquare(us), Checkers.LeastSignificantSquare()) | Checkers) & to.ToBitboard()) == 0)
                         return false;
                 }
-                else if ((AttackersTo(to, Pieces() ^ MakeBitboard(from)) & Pieces(us.Opposite())) != 0)
+                else if ((AttackersTo(to, Pieces() ^ from.ToBitboard()) & Pieces(us.Opposite())) != 0)
                     return false;
             }
 
@@ -169,7 +168,7 @@ namespace Chessour
             if (type == MoveType.EnPassant)
             {
                 Square ksq = KingSquare(us);
-                Square capsq = to.NegativeShift(us.PawnPush());
+                Square capsq = to.NegativeShift(PawnPush(us));
                 Bitboard occupancy = Pieces() ^ from.ToBitboard() ^ capsq.ToBitboard() | to.ToBitboard();
 
                 return (Attacks(Rook, ksq, occupancy) & Pieces(them, Queen, Rook)) == 0
@@ -186,7 +185,7 @@ namespace Chessour
                         return false;
             }
 
-            if (PieceAt(from).TypeOf() == King)
+            if (CoreFunctions.GetPieceType(PieceAt(from)) == King)
                 return (AttackersTo(to, Pieces() ^ from.ToBitboard()) & Pieces(them)) == 0;
 
             return (BlockersForKing(us) & from.ToBitboard()) == 0
@@ -197,10 +196,10 @@ namespace Chessour
             Square from = m.FromSquare();
             Square to = m.ToSquare();
 
-            if ((CheckSquares(PieceAt(from).TypeOf()) & MakeBitboard(to)) != 0)
+            if ((CheckSquares(CoreFunctions.GetPieceType(PieceAt(from))) & to.ToBitboard()) != 0)
                 return true;
 
-            if (((BlockersForKing(activeColor.Opposite()) & MakeBitboard(from)) != 0)
+            if (((BlockersForKing(activeColor.Opposite()) & from.ToBitboard()) != 0)
                 && !Alligned(from, to, KingSquare(activeColor.Opposite())))
                 return true;
 
@@ -209,11 +208,11 @@ namespace Chessour
                 case MoveType.Quiet:
                     return false;
                 case MoveType.Promotion:
-                    return (Attacks(m.PromotionPiece(), to, Pieces() ^ MakeBitboard(from)) & MakeBitboard(KingSquare(activeColor.Opposite()))) != 0;
+                    return (Attacks(m.PromotionPiece(), to, Pieces() ^ from.ToBitboard()) & KingSquare(activeColor.Opposite()).ToBitboard()) != 0;
 
                 case MoveType.EnPassant:
-                    Square capSq = MakeSquare(to.FileOf(), from.RankOf());
-                    Bitboard b = (Pieces() ^ MakeBitboard(from) ^ MakeBitboard(capSq)) | MakeBitboard(to);
+                    Square capSq = MakeSquare(to.GetFile(), from.GetRank());
+                    Bitboard b = (Pieces() ^ from.ToBitboard() ^ capSq.ToBitboard()) | to.ToBitboard();
 
                     return ((Attacks(Rook, KingSquare(activeColor.Opposite()), b) & Pieces(activeColor, Queen, Rook)) != 0)
                         | ((Attacks(Bishop, KingSquare(activeColor.Opposite()), b) & Pieces(activeColor, Queen, Bishop)) != 0);
@@ -375,7 +374,7 @@ namespace Chessour
             Piece piece = PieceAt(from);
             Piece captured = type == MoveType.EnPassant ? MakePiece(them, Pawn) : PieceAt(to);
 
-            Debug.Assert(captured.TypeOf() != King, FEN());
+            Debug.Assert(CoreFunctions.GetPieceType(captured) != King, FEN());
 
             if (type == MoveType.Castling)
             {
@@ -394,9 +393,9 @@ namespace Chessour
             {
                 Square capsq = to;
 
-                if (captured.TypeOf() == Pawn)
+                if (CoreFunctions.GetPieceType(captured) == Pawn)
                     if (type == MoveType.EnPassant)
-                        capsq -= (int)us.PawnPush();
+                        capsq -= (int)PawnPush(us);
 
                 RemovePieceAt(capsq);
                 state.ZobristKey ^= Zobrist.PieceKey(captured, capsq);
@@ -424,11 +423,11 @@ namespace Chessour
                 state.ZobristKey ^= Zobrist.PieceKey(piece, from) ^ Zobrist.PieceKey(piece, to);
             }
 
-            if (piece.TypeOf() == Pawn)
+            if (CoreFunctions.GetPieceType(piece) == Pawn)
             {
                 if (((int)from ^ (int)to) == 16)
                 {
-                    state.EnPassantSquare = to.NegativeShift(us.PawnPush());
+                    state.EnPassantSquare = to.NegativeShift(PawnPush(us));
                     state.ZobristKey ^= Zobrist.EnPassantKey(newSt.EnPassantSquare);
                 }
                 else if (type == MoveType.Promotion)
@@ -488,7 +487,7 @@ namespace Chessour
                 Square capsq = to;
                 if (type == MoveType.EnPassant)
                 {
-                    capsq -= (int)us.PawnPush();
+                    capsq -= (int)PawnPush(us);
                 }
 
                 SetPieceAt(captured, capsq);
@@ -505,48 +504,48 @@ namespace Chessour
 
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SetPieceAt(Piece p, Square s)
+        void SetPieceAt(Piece piece, Square square)
         {
-            Debug.Assert(s.IsValid() && PieceAt(s) == Piece.None);
+            Bitboard bitboard = square.ToBitboard();
 
-            Bitboard b = s.ToBitboard();
+            board[(int)square] = piece;
+            colorBitboards[(int)piece.GetColor()] |= bitboard;
+            typeBitboards[(int)AllPieces] |= typeBitboards[(int)piece.GetPieceType()] |= bitboard; ;
+            pieceCounts[(int)piece]++;
 
-            board[(int)s] = p;
-            typeBB[(int)p.TypeOf()] ^= b;
-            colorBB[(int)p.ColorOf()] ^= b;
-            pieceCount[(int)p]++;
-            materialScore += PSQT.Get(p, s);
+            materialScore += PSQT.Get(piece, square);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void RemovePieceAt(Square s)
+        void RemovePieceAt(Square square)
         {
-            Debug.Assert(s.IsValid() && PieceAt(s) != Piece.None);
+            Piece piece = PieceAt(square);
+            Bitboard bitboard = square.ToBitboard();
 
-            Piece p = PieceAt(s);
-
-            board[(int)s] = Piece.None;
-            typeBB[(int)p.TypeOf()] ^= s.ToBitboard();
-            colorBB[(int)p.ColorOf()] ^= s.ToBitboard();
-            pieceCount[(int)p]--;
-            materialScore -= PSQT.Get(p, s);
+            board[(int)square] = Piece.None;
+            colorBitboards[(int)piece.GetColor()] ^= bitboard;
+            typeBitboards[(int)piece.GetPieceType()] ^= bitboard;
+            typeBitboards[(int)AllPieces] ^= bitboard;
+            pieceCounts[(int)piece]--;
+            
+            materialScore -= PSQT.Get(piece, square);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void MovePiece(Square from, Square to)
         {
-            Debug.Assert(from.IsValid() && to.IsValid() && PieceAt(from) != Piece.None && from != to);
-
-            Piece p = PieceAt(from);
+            Piece piece = PieceAt(from);
             Bitboard fromto = from.ToBitboard() | to.ToBitboard();
+
             board[(int)from] = Piece.None;
-            board[(int)to] = p;
-            typeBB[(int)p.TypeOf()] ^= fromto;
-            colorBB[(int)p.ColorOf()] ^= fromto;
-            materialScore += PSQT.Get(p, to) - PSQT.Get(p, from);
+            board[(int)to] = piece;
+            colorBitboards[(int)piece.GetColor()] ^= fromto;
+            typeBitboards[(int)piece.GetPieceType()] ^= fromto;
+            typeBitboards[(int)AllPieces] ^= fromto;
+            
+            materialScore += PSQT.Get(piece, to) - PSQT.Get(piece, from);
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         void HandleCastlingMove(Color us, Square kfrom, Square rfrom, out Square kto, out Square rto, bool undo = false)
         {
             bool kingSide = rfrom > kfrom;
@@ -617,7 +616,7 @@ namespace Chessour
 
                     //If the blocker is same color as the piece on target square that makes the sniper a pinner
                     //And blocker a pinned piece
-                    if ((betweenPieces & Pieces(PieceAt(target).ColorOf())) != 0)
+                    if ((betweenPieces & Pieces(PieceAt(target).GetColor())) != 0)
                         pinners |= sniperSq.ToBitboard();
                 }
             }
@@ -628,12 +627,14 @@ namespace Chessour
         void Clear()
         {
             Array.Clear(board);
-            Array.Clear(typeBB);
-            Array.Clear(colorBB);
-            Array.Clear(pieceCount);
+            Array.Clear(typeBitboards);
+            Array.Clear(colorBitboards);
+            Array.Clear(pieceCounts);
+
             Array.Clear(castlingRookSquare);
             Array.Clear(castlingRightMask);
             Array.Clear(castlingPath);
+
             activeColor = 0;
             gamePly = 0;
             materialScore = Score.Zero;

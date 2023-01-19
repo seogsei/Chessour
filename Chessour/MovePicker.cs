@@ -1,7 +1,6 @@
-﻿using System;
+﻿using static Chessour.Evaluation;
 
-using static Chessour.Evaluation;
-namespace Chessour.Types
+namespace Chessour
 {
     ref struct MovePicker
     {
@@ -111,15 +110,12 @@ namespace Chessour.Types
             for (MoveScore m = moves[i]; i < end; m = moves[++i])
                 if (type == GenerationType.Captures)
                 {
-                    m.Score = (int)PieceValue(position.PieceAt(m.Move.ToSquare())).MidGame
-                            - (int)PieceValue(position.PieceAt(m.Move.FromSquare())).MidGame;
+                    m.Score = (int)PieceValue(GamePhase.MidGame, position.PieceAt(m.Move.ToSquare()))
+                            - (int)PieceValue(GamePhase.MidGame, position.PieceAt(m.Move.FromSquare()));
 
                     if (m.Move.TypeOf() == MoveType.Promotion)
-                        m.Score += (int)PieceValue(m.Move.PromotionPiece()).MidGame;
+                        m.Score += (int)PieceValue(GamePhase.MidGame, (Piece)m.Move.PromotionPiece());
                 }
-
-
-
         }
         private Move FindNext()
         {

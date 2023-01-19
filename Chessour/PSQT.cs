@@ -1,5 +1,4 @@
-﻿using Chessour.Types;
-using System;
+﻿using static Chessour.Evaluation;
 
 namespace Chessour
 {
@@ -101,6 +100,10 @@ namespace Chessour
         {
             return new(mg, eg);
         }
+        static Score S(Value mg, Value eg)
+        {
+            return new(mg, eg);
+        }
 
         public static void Init() { }
 
@@ -110,12 +113,12 @@ namespace Chessour
 
             foreach (Piece pc in pieces)
             {
-                Score pieceScore = Evaluation.PieceValue(pc);
+                Score pieceScore = S(PieceValue(GamePhase.MidGame, pc), PieceValue(GamePhase.EndGame, pc));
 
                 for (Square s = Square.a1; s <= Square.h8; s++)
                 {
-                    psqt[(int)pc, (int)s] = pieceScore + (pc.TypeOf() == PieceType.Pawn ? bonuses[(int)pc][(int)s.RankOf()][(int)s.FileOf()]
-                                                                                                     : bonuses[(int)pc][(int)s.RankOf()][s.FileOf().EdgeDistance()]);
+                    psqt[(int)pc, (int)s] = pieceScore + (CoreFunctions.GetPieceType(pc) == PieceType.Pawn ? bonuses[(int)pc][(int)s.GetRank()][(int)s.GetFile()]
+                                                                                                           : bonuses[(int)pc][(int)s.GetRank()][s.GetFile().EdgeDistance()]);
 
                     psqt[(int)pc.Opposite(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
 

@@ -1,7 +1,4 @@
-﻿using Chessour.Types;
-using System;
-
-namespace Chessour
+﻿namespace Chessour
 {
     internal static class Zobrist
     {
@@ -12,7 +9,7 @@ namespace Chessour
         public static Key PieceKey(Piece p, Square sq) => pieceKeys[(int)p, (int)sq];
         public static Key SideKey { get => sideKey; }
         public static Key CastlingKey(CastlingRight cr) => castlingKeys[(int)cr];
-        public static Key EnPassantKey(Square epSqr) => enPassantKeys[(int)epSqr.FileOf()];
+        public static Key EnPassantKey(Square epSqr) => enPassantKeys[(int)epSqr.GetFile()];
 
         public static void Init() { }
         static Zobrist()

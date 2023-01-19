@@ -2,62 +2,47 @@
 {
     public enum PieceType
     {
-        None,
-        Pawn,
-        Knight,
-        Bishop,
-        Rook,
-        Queen,
-        King,
+        AllPieces = 0,
+        None = 0,
+        Pawn, Knight, Bishop, Rook, Queen, King,
         NB
     }
+
     public enum Piece
     {
         None,
-        WhitePawn,
-        WhiteKnight,
-        WhiteBishop,
-        WhiteRook,
-        WhiteQueen,
-        WhiteKing,
-
-        BlackPawn = WhitePawn + 8,
-        BlackKnight,
-        BlackBishop,
-        BlackRook,
-        BlackQueen,
-        BlackKing,
+        WhitePawn = PieceType.Pawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing,
+        BlackPawn = PieceType.Pawn + 8, BlackKnight, BlackBishop, BlackRook, BlackQueen, BlackKing,
         NB
     }
 
-    public static class PieceExtensions
+
+    public static partial class CoreFunctions
     {
-        public static bool IsValid(this PieceType pieceType)
+        public static Piece MakePiece(Color color, PieceType pieceType)
         {
-            return pieceType >= 0 && pieceType < PieceType.NB;
+            return (Piece)(((int)color << 3) | (int)pieceType);
         }
 
-        public static PieceType TypeOf(this Piece piece)
+        public static PieceType GetPieceType(this Piece piece)
         {
             return (PieceType)((int)piece & 7);
         }
 
-        public static Color ColorOf(this Piece piece)
+        public static Color GetColor(this Piece piece)
         {
             return (Color)((int)piece >> 3);
+        }
+
+        public static bool IsValid(this PieceType pieceType)
+        {
+            return pieceType >= 0 && pieceType < PieceType.NB;
         }
 
         public static Piece Opposite(this Piece piece)
         {
             return (Piece)((int)piece ^ 8);
         }
-    }
 
-    public static partial class Factory
-    {
-        public static Piece MakePiece(Color color, PieceType pieceType)
-        {
-            return (Piece)(((int)color << 3) | (int)pieceType);
-        }
     }
 }

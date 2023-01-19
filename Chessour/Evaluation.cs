@@ -1,14 +1,72 @@
-﻿using Chessour.Types;
-using System;
-using System.Text;
+﻿using System.Text;
 using static Chessour.Bitboards;
 using static Chessour.Types.PieceType;
-using static Chessour.Types.Value;
 
 namespace Chessour
 {
+    public enum Value
+    {
+        Zero = 0,
+        Draw = 0,
+        KnownWin = MateInMaxPly - 1,
+        MateInMaxPly = Mate - SearchObject.MaxPly,
+        Mate = 32000,
+        Max = 32001,
+
+        KnownLoss = -KnownWin,
+        Mated = -Mate,
+        Min = -Max,
+
+        PawnMG = 100, PawnEG = 110,
+        KnightMG = 300, KnightEG = 300,
+        BishopMG = 300, BishopEG = 300,
+        RookMG = 440, RookEG = 480,
+        QueenMG = 890, QueenEG = 950,
+    }
+
+    public readonly struct Score
+    {
+        readonly short midGame;
+        readonly short endGame;
+
+        public Value MidGame { get => (Value)midGame; }
+        public Value EndGame { get => (Value)endGame; }
+
+        public Score(Value midGame, Value endGame)
+        {
+            this.midGame = (short)midGame;
+            this.endGame = (short)endGame;
+        }
+        public Score(int midGame, int endGame)
+        {
+            this.midGame = (short)midGame;
+            this.endGame = (short)endGame;
+        }
+
+        public static Score Zero { get; } = default;
+
+        public static Score operator +(Score lhs, Score rhs)
+        {
+            return new Score(lhs.midGame + rhs.midGame, lhs.endGame + rhs.endGame);
+        }
+        public static Score operator -(Score lhs, Score rhs)
+        {
+            return new Score(lhs.midGame - rhs.midGame, lhs.endGame - rhs.endGame);
+        }
+        public static Score operator -(Score score)
+        {
+            return new Score(-score.midGame, -score.endGame);
+        }
+    }
+
     public static class Evaluation
     {
+        public static Value Negate(this Value value)
+        {
+            return (Value)(-(int)value);
+        }
+        static Score S(int mg, int eg) => new(mg, eg);
+
         internal static class Trace
         {
             public enum Term
@@ -66,15 +124,21 @@ namespace Chessour
             }
         }
 
-        static Score S(int mg, int eg) => new(mg, eg);
-        static Score S(Value mg, Value eg) => new(mg, eg);
-
         public static void Init() { }
 
-        static readonly Score[] pieceValues = new Score[(int)Piece.NB]
+        static readonly Value[][] pieceValues = new Value[(int)GamePhase.NB][]
         {
-            Score.Zero, S(PawnMG, PawnEG), S(KnightMG, KnightEG), S(BishopMG, BishopEG), S(RookMG, RookEG), S(QueenMG, QueenEG), Score.Zero, Score.Zero,
-            Score.Zero, S(PawnMG, PawnEG), S(KnightMG, KnightEG), S(BishopMG, BishopEG), S(RookMG, RookEG), S(QueenMG, QueenEG), Score.Zero,
+            new Value[(int)Piece.NB]
+            {
+                Value.Zero, Value.PawnMG, Value.KnightMG, Value.BishopMG, Value.RookMG, Value.QueenMG, Value.Zero, Value.Zero,
+                Value.Zero, Value.PawnMG, Value.KnightMG, Value.BishopMG, Value.RookMG, Value.QueenMG, Value.Zero
+
+            },
+            new Value[(int)Piece.NB]
+            {
+                Value.Zero, Value.PawnEG, Value.KnightEG, Value.BishopEG, Value.RookEG, Value.QueenEG, Value.Zero, Value.Zero,
+                Value.Zero, Value.PawnEG, Value.KnightEG, Value.BishopEG, Value.RookEG, Value.QueenEG, Value.Zero
+            }
         };
         static readonly Score[][] pieceMobility = new Score[(int)PieceType.NB][]
         {
@@ -102,8 +166,12 @@ namespace Chessour
                             S(0,0), S(0,0), S(0,0), S(0,0), S(0,0),
                             S(0,0), S(0,0), S(0,0)  },
         };
-        public static Score PieceValue(PieceType pt) => pieceValues[(int)pt];
-        public static Score PieceValue(Piece pc) => pieceValues[(int)pc];
+       
+        public static Value PieceValue(GamePhase phase, Piece piece)
+        {
+            return pieceValues[(int)phase][(int)piece];
+        }
+       
         public static bool SeeGe(this Position position, Move m, Value threshold = 0)
         {
             if (m.TypeOf() != MoveType.Quiet)
@@ -112,11 +180,11 @@ namespace Chessour
             Square from = m.FromSquare();
             Square to = m.ToSquare();
 
-            int swap = PieceValue(position.PieceAt(to)).MidGame - threshold;
+            int swap = PieceValue(GamePhase.MidGame, position.PieceAt(to)) - threshold;
             if (swap < 0)
                 return false;
 
-            swap = (int)PieceValue(position.PieceAt(from)).MidGame - swap;
+            swap = (int)PieceValue(GamePhase.MidGame, position.PieceAt(from)) - swap;
             if (swap <= 0)
                 return true;
 
@@ -148,41 +216,41 @@ namespace Chessour
 
                 if ((bb = sideAttackers & position.Pieces(Pawn)) != 0)
                 {
-                    if ((swap = (int)PawnMG - swap) < result)
+                    if ((swap = (int)Value.PawnMG - swap) < result)
                         break;
 
-                    occupied ^= bb.LeastSignificantSquareBitboard();
+                    occupied ^= bb.LeastSignificantBit();
                     attackers |= Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen);
                 }
                 else if ((bb = sideAttackers & position.Pieces(Knight)) != 0)
                 {
-                    if ((swap = (int)KnightMG - swap) < result)
+                    if ((swap = (int)Value.KnightMG - swap) < result)
                         break;
 
-                    occupied ^= bb.LeastSignificantSquareBitboard();
+                    occupied ^= bb.LeastSignificantBit();
                 }
                 else if ((bb = sideAttackers & position.Pieces(Bishop)) != 0)
                 {
-                    if ((swap = (int)BishopMG - swap) < result)
+                    if ((swap = (int)Value.BishopMG - swap) < result)
                         break;
 
-                    occupied ^= bb.LeastSignificantSquareBitboard();
+                    occupied ^= bb.LeastSignificantBit();
                     attackers |= Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen);
                 }
                 else if ((bb = sideAttackers & position.Pieces(Rook)) != 0)
                 {
-                    if ((swap = (int)RookMG - swap) < result)
+                    if ((swap = (int)Value.RookMG - swap) < result)
                         break;
 
-                    occupied ^= bb.LeastSignificantSquareBitboard();
+                    occupied ^= bb.LeastSignificantBit();
                     attackers |= Attacks(Rook, to, occupied) & position.Pieces(Rook, Queen);
                 }
                 else if ((bb = sideAttackers & position.Pieces(Queen)) != 0)
                 {
-                    if ((swap = (int)QueenMG - swap) < result)
+                    if ((swap = (int)Value.QueenMG - swap) < result)
                         break;
 
-                    occupied ^= bb.LeastSignificantSquareBitboard();
+                    occupied ^= bb.LeastSignificantBit();
                     attackers |= (Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen))
                               | (Attacks(Rook, to, occupied) & position.Pieces(Rook, Queen));
                 }
@@ -197,13 +265,14 @@ namespace Chessour
 
         public static double ToPawnValue(Value evaluation)
         {
-            return (int)evaluation / (double)PawnMG;
+            return (int)evaluation / (double)Value.PawnMG;
         }
+       
         public static Value Evaluate(Position position, bool trace = false)
         {
             //return new EvaluationContainer(position).Evaluate();
             if (position.IsCheck())
-                return Min;
+                return Value.Min;
 
             if (trace)
                 Trace.Clear();
@@ -221,7 +290,6 @@ namespace Chessour
             Value v = TaperedEval(score, position, trace);
             return position.ActiveColor == Color.White ? v : v.Negate();
         }
-
 
         private static Score PieceMobility(Color side, Position pos, bool trace)
         {
@@ -263,15 +331,15 @@ namespace Chessour
             Value mg = score.MidGame;
             Value eg = score.EndGame;
 
-            Phase phase = Phase.Total;
+            PhaseValues phase = PhaseValues.Total;
 
-            phase -= (position.PieceCount(MakePiece(Color.White, Pawn)) + position.PieceCount(MakePiece(Color.Black, Pawn))) * (int)Phase.Pawn;
-            phase -= (position.PieceCount(MakePiece(Color.White, Knight)) + position.PieceCount(MakePiece(Color.Black, Knight))) * (int)Phase.Knight;
-            phase -= (position.PieceCount(MakePiece(Color.White, Bishop)) + position.PieceCount(MakePiece(Color.Black, Bishop))) * (int)Phase.Bishop;
-            phase -= (position.PieceCount(MakePiece(Color.White, Rook)) + position.PieceCount(MakePiece(Color.Black, Rook))) * (int)Phase.Rook;
-            phase -= (position.PieceCount(MakePiece(Color.White, Queen)) + position.PieceCount(MakePiece(Color.Black, Queen))) * (int)Phase.Queen;
+            phase -= (position.PieceCount(MakePiece(Color.White, Pawn)) + position.PieceCount(MakePiece(Color.Black, Pawn))) * (int)PhaseValues.Pawn;
+            phase -= (position.PieceCount(MakePiece(Color.White, Knight)) + position.PieceCount(MakePiece(Color.Black, Knight))) * (int)PhaseValues.Knight;
+            phase -= (position.PieceCount(MakePiece(Color.White, Bishop)) + position.PieceCount(MakePiece(Color.Black, Bishop))) * (int)PhaseValues.Bishop;
+            phase -= (position.PieceCount(MakePiece(Color.White, Rook)) + position.PieceCount(MakePiece(Color.Black, Rook))) * (int)PhaseValues.Rook;
+            phase -= (position.PieceCount(MakePiece(Color.White, Queen)) + position.PieceCount(MakePiece(Color.Black, Queen))) * (int)PhaseValues.Queen;
 
-            phase = (Phase)(((int)phase * 256 + ((int)Phase.Total / 2)) / (int)Phase.Total);
+            phase = (PhaseValues)(((int)phase * 256 + ((int)PhaseValues.Total / 2)) / (int)PhaseValues.Total);
 
             Value v = (Value)((((int)mg * (256 - (int)phase)) + ((int)eg * (int)phase)) / 256);
 
@@ -280,6 +348,5 @@ namespace Chessour
 
             return v;
         }
-
     }
 }

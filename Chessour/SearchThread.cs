@@ -1,6 +1,4 @@
-﻿using Chessour.Types;
-using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 
@@ -8,18 +6,18 @@ namespace Chessour
 {
     sealed class SearchPool : List<SearchThread>
     {
-        private MasterSearchThread Main => (MasterSearchThread)this[0];
-        public void WaitForSeachFinish() => Main.WaitForSearchFinish();
-        public bool Stop
+        private MasterSearchThread Master { get => (MasterSearchThread)this[0]; } 
+
+        public void Stop()
         {
-            get => Main.Stop;
-            set
-            {
-                foreach (SearchThread th in this)
-                    th.Stop = value;
-            }
+            Master.Search.Stop = true;
         }
 
+        public void WaitForSeachFinish() 
+        {
+            Master.WaitForSearchFinish();
+        } 
+       
         public ulong NodesSearched()
         {
             ulong total = 0;
@@ -56,58 +54,51 @@ namespace Chessour
             }
         }
 
-        public void StartThinking(Position pos, in SearchContext.SearchLimits limits, bool ponder)
+        public void StartThinking(Position pos, in SearchObject.SearchLimits limits, bool ponder)
         {
-            Main.WaitForSearchFinish();
+            Master.WaitForSearchFinish();
 
-            Stop = false;
-
-            MoveList moves = new(pos, stackalloc MoveScore[MoveList.MaxMoveCount]);
+            MoveList moves = new(pos, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
 
             foreach (SearchThread th in this)
             {
+                th.Search.Stop = false;
                 th.Search.limits = limits;
                 th.rootDepth = 0;
                 th.Search.rootMoves.Clear();
                 th.Search.Reset();
                 foreach (Move m in moves)
-                    if (limits.SearchMoves.Count == 0 || limits.SearchMoves.Contains(m))
+                    if (limits.searchMoves is null || limits.searchMoves.Contains(m))
                         th.Search.rootMoves.Add(m);
 
-                th.rootPosition.Set(pos, th.rootState);
+                th.RootPosition.Set(pos, th.RootStateInfo);
             }
 
-            Main.Release();
+            Master.Release();
         }
     }
 
     class SearchThread
     {
-        public SearchContext Search { get; }
-        public bool SendInfo { get; set; }
+        public Position RootPosition { get; }
+        public Position.StateInfo RootStateInfo { get; }
+        public SearchObject Search { get; }
         public bool Searching { get; private set; }
-        public bool Stop
-        {
-            get => Search.Stop;
-            set => Search.Stop = value;
-        }
+        public bool Stop { get => Search.Stop; set => Search.Stop = value; }
         public bool Exit { get; private set; }
-
         public ulong Nodes { get; protected set; }
 
-        public Mutex mutex;
-        public Position rootPosition;
-        public Position.StateInfo rootState;
+
         public int rootDepth;
         public Move lastBestMove;
         public Value bestValue;
 
-
         readonly Thread thread;
+        readonly Mutex mutex;
 
         public SearchThread()
         {
-            rootPosition = new Position(rootState = new Position.StateInfo());
+            RootPosition = new Position(RootStateInfo = new Position.StateInfo());
             Search = new();
 
             mutex = new(false);
@@ -125,6 +116,7 @@ namespace Chessour
             Release();
             thread.Join();
         }
+       
         public void Release()
         {
             lock (mutex)
@@ -133,15 +125,17 @@ namespace Chessour
                 Monitor.PulseAll(mutex);
             }
         }
+       
         public void WaitForSearchFinish()
         {
-            lock (mutex)
-            {
-                if (Searching)
+            if (Searching)
+                lock (mutex)
+                {
                     Monitor.Wait(mutex);
-            }
+                }
         }
-        void IdleLoop()
+       
+        private void IdleLoop()
         {
             while (true)
             {
@@ -160,6 +154,7 @@ namespace Chessour
                 StartSearch();
             }
         }
+       
         protected virtual void StartSearch()
         {
             Value alpha, beta;
@@ -167,14 +162,14 @@ namespace Chessour
             bestValue = alpha = Value.Min;
             beta = Value.Max;
 
-            while (++rootDepth < SearchContext.MaxDepth
+            while (++rootDepth < SearchObject.MaxDepth
                 && !Stop
-                && !(Search.limits.Depth > 0 && rootDepth > Search.limits.Depth))
+                && !(Search.limits.depth > 0 && rootDepth > Search.limits.depth))
             {
                 foreach (var rm in Search.rootMoves)
                     rm.PreviousScore = rm.Score;
 
-                bestValue = Search.Search(NodeType.Root, rootPosition, 0, alpha, beta, rootDepth);
+                bestValue = Search.Search(NodeType.Root, RootPosition, 0, alpha, beta, rootDepth);
 
                 if (Stop)
                     break;
@@ -192,7 +187,6 @@ namespace Chessour
             {
                 lastBestMove = Search.rootMoves[0].Move;
             }
-
         }
     }
     class MasterSearchThread : SearchThread
@@ -206,9 +200,9 @@ namespace Chessour
 
         protected override void StartSearch()
         {
-            if (Search.limits.Perft > 0)
+            if (Search.limits.perft > 0)
             {
-                Nodes = Search.Perft(rootPosition, Search.limits.Perft);
+                Nodes = Search.Perft(RootPosition, Search.limits.perft);
 
                 Console.WriteLine("\nNodes searched: " + Nodes + "\n");
                 return;
@@ -216,7 +210,7 @@ namespace Chessour
 
             if (Search.rootMoves.Count == 0)
             {
-                Console.WriteLine("info depth 0 score " + (rootPosition.IsCheck() ? Value.Mated : Value.Draw));
+                Console.WriteLine("info depth 0 score " + (RootPosition.IsCheck() ? Value.Mated : Value.Draw));
             }
             else
             {

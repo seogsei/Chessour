@@ -1,15 +1,13 @@
-﻿using Chessour.Types;
-using System;
-using System.Collections.Generic;
-using static Chessour.SearchContext;
-using static Chessour.Types.ValueUtills;
+﻿using System.Collections.Generic;
+using System.Security.Cryptography;
+using static Chessour.SearchObject;
 
 namespace Chessour
 {
     public enum NodeType { NonPV, PV, Root }
     class RootMoves : List<RootMove>
     {
-        public RootMoves() : base(MoveList.MaxMoveCount) { }
+        public RootMoves() : base(MoveGenerator.MaxMoveCount) { }
 
         public void Add(Move m) => Add(new RootMove(m));
         public bool Contains(Move m)
@@ -81,33 +79,42 @@ namespace Chessour
         public Value staticEval;
     }
 
-    class SearchContext
+    class SearchObject
     {
         public const int MaxDepth = 128;
         public const int MaxPly = 128;
+
+        public static Value MatedIn(int ply)
+        {
+            return MateIn(ply).Negate();
+        }
+
+        public static Value MateIn(int ply)
+        {
+            return Value.Mate - ply;
+        }
+
         public struct SearchLimits
         {
-            public List<Move> SearchMoves { get; }
-            public int Perft { get; set; }
-            public int Depth { get; set; }
-
-            public SearchLimits()
-            {
-                SearchMoves = new();
-                Perft = Depth = 0;
-            }
+            public List<Move> searchMoves;
+            public int perft;
+            public int depth;
         }
 
         public bool Stop { get; set; }
 
         public RootMoves rootMoves;
+
         public readonly SearchStack[] searchStack;
+
         readonly FastStack<Position.StateInfo> stateInfos;
+
         public SearchLimits limits;
+
         public ulong NodeCount { get; private set; }
         public ulong QNodeCount { get; private set; }
 
-        public SearchContext()
+        public SearchObject()
         {
             stateInfos = new(MaxPly);
             searchStack = new SearchStack[MaxPly];
@@ -119,6 +126,7 @@ namespace Chessour
                 searchStack[i] = new();
             }
         }
+
         public ulong Perft(Position position, int depth, bool root = true)
         {
             bool leaf = depth == 2;
@@ -126,7 +134,7 @@ namespace Chessour
             ulong branchNodes, nodes = 0;
             var state = stateInfos.Pop();
 
-            foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]))
+            foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]))
             {
                 if (root && depth <= 1)
                     nodes += branchNodes = 1;
@@ -135,7 +143,7 @@ namespace Chessour
                 {
                     position.MakeMove(m, state);
 
-                    nodes += branchNodes = leaf ? (ulong)new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]).Count
+                    nodes += branchNodes = leaf ? (ulong)new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]).Count
                                                 : Perft(position, depth - 1, false);
 
                     position.Takeback();
@@ -193,7 +201,6 @@ namespace Chessour
             bestMove = Move.None;
             moveCount = 0;
 
-
             Key posKey = position.ZobristKey;
 
             ref TTEntry ttEntry = ref TranspositionTable.ProbeTT(posKey, out searchStack[ply].ttHit);
@@ -203,7 +210,7 @@ namespace Chessour
                                                    : Move.None;
 
             //Moves loop
-            MovePicker mp = new(position, ttMove, stackalloc MoveScore[MoveList.MaxMoveCount]);
+            MovePicker mp = new(position, ttMove, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
 
             Position.StateInfo st = stateInfos.Pop();
             while ((move = mp.NextMove()) != Move.None)
@@ -394,7 +401,7 @@ namespace Chessour
 
 
             //Moves loop
-            MovePicker mp = new(position, Move.None, Square.a1, stackalloc MoveScore[MoveList.MaxMoveCount]);
+            MovePicker mp = new(position, Move.None, Square.a1, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
 
             Position.StateInfo st = stateInfos.Pop();
             while ((move = mp.NextMove()) != Move.None)
@@ -447,7 +454,7 @@ namespace Chessour
             //After searching every move if we have found no legal moves and we are in check we are mated
             if (searchStack[ply].inCheck && bestValue == Value.Min)
             {
-                Debug.Assert(new MoveList(position, stackalloc MoveScore[MoveList.MaxMoveCount]).Count == 0);
+                Debug.Assert(new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]).Count == 0);
                 return MatedIn(ply);
             }
 

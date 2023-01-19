@@ -1,6 +1,9 @@
+global using System;
 global using System.Diagnostics;
 global using System.Runtime.CompilerServices;
-global using static Chessour.Types.Factory;
+global using Chessour.Types;
+global using static Chessour.Types.CoreFunctions;
+
 using System.Runtime.InteropServices;
 
 [assembly: ComVisible(false)]

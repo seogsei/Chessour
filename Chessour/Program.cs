@@ -7,7 +7,8 @@
             Bitboards.Init();
             Zobrist.Init();
             PSQT.Init();
-            Evaluation.Init();
+            Evaluation.Init();         
+            Engine.Init();
 
             UCI.Run(args);
 
