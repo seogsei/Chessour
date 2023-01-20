@@ -1,4 +1,6 @@
-﻿namespace Chessour
+﻿using System.Runtime.InteropServices;
+
+namespace Chessour
 {
     class Program
     {

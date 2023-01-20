@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Security.Cryptography;
 using static Chessour.SearchObject;
 
 namespace Chessour
@@ -78,7 +77,6 @@ namespace Chessour
         public bool ttPv;
         public Value staticEval;
     }
-
     class SearchObject
     {
         public const int MaxDepth = 128;
@@ -113,6 +111,7 @@ namespace Chessour
 
         public ulong NodeCount { get; private set; }
         public ulong QNodeCount { get; private set; }
+        public ulong TTHits { get; private set; }
 
         public SearchObject()
         {
@@ -203,7 +202,7 @@ namespace Chessour
 
             Key posKey = position.ZobristKey;
 
-            ref TTEntry ttEntry = ref TranspositionTable.ProbeTT(posKey, out searchStack[ply].ttHit);
+            ref TTEntry ttEntry = ref Engine.TTTable.ProbeTT(posKey, out searchStack[ply].ttHit);
             ttValue = searchStack[ply].ttHit ? ttEntry.Evaluation : 0;
             ttMove = root ? rootMoves[0].Move
                           : searchStack[ply].ttHit ? ttEntry.Move
@@ -299,14 +298,14 @@ namespace Chessour
                         if (pvNode && value < beta)
                         {
                             alpha = value;
-                            /*
+                            
                             //We are happy with one improvement so we can shorten searches of the other moves to speed up overal search                            
                             if (depth > 1
                             && depth < 6
                             && beta < Value.KnownWin
                             && alpha > Value.KnownLoss)
                                 depth -= 1;
-                            */
+                            
                             Debug.Assert(depth > 0);
                         }
                         else
@@ -335,11 +334,11 @@ namespace Chessour
             ttEntry.Save(posKey, depth, move, pvNode,
                 bestValue >= beta ? Bound.LowerBound
                                   : pvNode && bestMove != Move.None ? Bound.Exact
-                                                                    : Bound.UpperBound, bestValue);
+                                                                    : Bound.UpperBound, bestValue,Engine.TTTable.Generation);
 
             return bestValue;
         }
-
+     
         private Value QSearch(NodeType nodeType, Position position, int ply, Value alpha, Value beta, int depth = 0)
         {
             bool root = nodeType == NodeType.Root;
@@ -373,7 +372,7 @@ namespace Chessour
 
             //Transposition table
             posKey = position.ZobristKey;
-            ref var ttEntry = ref TranspositionTable.ProbeTT(posKey, out searchStack[ply].ttHit);
+            ref var ttEntry = ref Engine.TTTable.ProbeTT(posKey, out searchStack[ply].ttHit);
             ttValue = searchStack[ply].ttHit ? ttEntry.Evaluation : 0;
             ttMove = searchStack[ply].ttHit ? ttEntry.Move : Move.None;
 
@@ -461,11 +460,12 @@ namespace Chessour
             ttEntry.Save(posKey, depth, bestMove, pvNode,
                 bestValue >= beta ? Bound.LowerBound
                                   : Bound.UpperBound,
-                searchStack[ply].staticEval);
+                searchStack[ply].staticEval, Engine.TTTable.Generation);
 
             Debug.Assert(bestValue > Value.Min && bestValue < Value.Max);
             return bestValue;
         }
+
         private static void UpdatePV(Move[] pv, Move move, Move[] childPv)
         {
             int i = 0, j = 0;

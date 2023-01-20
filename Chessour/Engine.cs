@@ -7,6 +7,7 @@ namespace Chessour
         public const string Name = "Chessour";
         public const string Author = "Muhammed İkbal Yaman";
         public static SearchPool Threads { get; }
+        public static TranspositionTable TTTable { get; }
 
         readonly static Stopwatch timer;
 
@@ -20,6 +21,8 @@ namespace Chessour
             timer.Start();
 
             Threads = new SearchPool(1);
+
+            TTTable = new TranspositionTable();
         }
     }
 }

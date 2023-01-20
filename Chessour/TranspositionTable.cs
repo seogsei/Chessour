@@ -1,4 +1,5 @@
 ﻿using System.Runtime.InteropServices;
+using System.Numerics;
 
 namespace Chessour
 {
@@ -11,65 +12,86 @@ namespace Chessour
 
     struct TTEntry
     {
-        Key key;
+        Key key; 
+        ushort move;
+        short evaluation;
         byte depth;
         byte gen8;
-        ushort move;
-        short eval;
 
         public Key Key { get => key; }
         public int Depth { get => depth; }
         public Move Move { get => (Move)move; }
-        public bool isPV { get => (gen8 & 4) != 0; }
-        public Bound Bound { get => (Bound)(gen8 & 3); }
-        public Value Evaluation { get => (Value)eval; }
+        public bool IsPV { get => (gen8 & 4) != 0; }
+        public Bound BoundType { get => (Bound)(gen8 & 3); }
+        public int Generation { get => (int)gen8 >> 3; }
+        public Value Evaluation { get => (Value)evaluation; }
 
-        public void Save(Key key, int depth, Move move, bool isPV, Bound boundType, Value evaluation)
+        public void Save(Key key, int depth, Move move, bool isPV, Bound boundType, Value evaluation, int generation)
         {
-            this.key = key;
-            this.move = (ushort)move;
-            this.eval = (short)evaluation;
-            this.depth = (byte)depth;
+            if (move != Move.None || key != Key)
+                this.move = (ushort)move;
 
-            byte gen8 = (byte)((isPV ? 4 : 0) | (int)boundType);
-            this.gen8 = gen8;
+            if (boundType == Bound.Exact
+                || key != Key
+                || depth - (-7) + (isPV ? 2 : 0) > Depth - 4)
+            {
+                this.key = key;
+                this.evaluation = (short)evaluation;
+                this.depth = (byte)depth;
+                this.gen8 = (byte)(generation | (isPV ? 4 : 0) | (int)boundType);
+            }
         }
     }
 
-    static class TranspositionTable
+    class TranspositionTable
     {
-        static TTEntry[] entries;
-        static int shift;
+        TTEntry[] entries;
 
-        static TranspositionTable()
+        public int Generation { get; private set; }
+
+        public void Init() { }
+
+        public TranspositionTable(uint initialSizeInMB = 8)
         {
-            entries = new TTEntry[1 << 16];
-            shift = 64 - 16;
+            Resize(initialSizeInMB);
+
+            if (entries is null)
+                throw new Exception();
         }
 
-        public static void Resize(int sizeInMB)
+        public void NewSearch()
         {
-            if (sizeInMB < 0)
-                return;
-
-            int entryCount = sizeInMB * 1024 * 1024 / Marshal.SizeOf(typeof(TTEntry));
+            Generation += 1 << 3;
         }
-        public static void Clear()
+
+        public void Resize(uint sizeInMB)
+        {
+            Engine.Threads.WaitForSeachFinish();
+
+            //If size is not a power of 2 get the nearest smaller power of 2
+            if(!BitOperations.IsPow2(sizeInMB))
+                sizeInMB = BitOperations.RoundUpToPowerOf2(sizeInMB / 2);
+
+            nuint entryCount = (nuint)(sizeInMB * 1024 * 1024 / Marshal.SizeOf(typeof(TTEntry)));
+
+            entries = new TTEntry[entryCount];
+        }
+        public void Clear()
         {
             Array.Clear(entries);
         }
 
-        public static ref TTEntry ProbeTT(Key key, out bool found)
+        public ref TTEntry ProbeTT(Key key, out bool found)
         {
             ref TTEntry entry = ref Find(key);
 
-            found = entry.Depth != 0;
+            found = entry.Key == key;
             return ref entry;
         }
 
-        private static ref TTEntry Find(Key key)
+        private ref TTEntry Find(Key key)
         {
-            return ref entries[(ulong)key >> shift];
+            return ref entries[(ulong)key & (ulong)entries.Length - 1 ];
         }
     }
 }
