@@ -43,7 +43,7 @@ namespace Chessour
 
         public void Generate(GenerationType type)
         {
-            end = MoveGenerator.Generate(type, position, moves, curent);
+            end += MoveGenerator.Generate(type, position, moves[end..]);
         }
 
         public Move NextMove()
@@ -61,8 +61,7 @@ namespace Chessour
                 //Normal Positions
                 case Stage.CaptureGenerate:
                     curent = 0;
-                    end = MoveGenerator.Generate(GenerationType.Captures, position, moves, curent);
-
+                    Generate(GenerationType.Captures);
                     Score(GenerationType.Captures);
                     PartialInsertionSort(curent, end);
                     stage++;
@@ -75,7 +74,7 @@ namespace Chessour
                     goto top;
                 case Stage.QuietGenerate:
                     curent = 0;
-                    end = MoveGenerator.Generate(GenerationType.Quiets, position, moves, curent);
+                    Generate(GenerationType.Quiets);
                     stage++;
                     goto top;
 

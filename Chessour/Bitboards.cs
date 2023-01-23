@@ -32,114 +32,6 @@ namespace Chessour
 
     static class Bitboards
     {
-        static class Magics
-        {
-            public struct MagicStruct
-            {
-                public Bitboard mask;
-                public ulong magic;
-                public int shift;
-                public Bitboard[] attacks;
-
-                public readonly int CalculateIndex(Bitboard occupancy)
-                {
-                    return (int)((ulong)(occupancy & mask) * magic >> shift);
-                }
-                public readonly Bitboard GetAttack(Bitboard occupancy)
-                {
-                    return attacks[CalculateIndex(occupancy)];
-                }
-            }
-
-            public static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
-            public static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
-
-            public static void Init() { }
-
-            private static void CalculateMagics(PieceType pt, MagicStruct[] target)
-            {
-                Random random = new(4661);
-
-                int size = 0;
-                int attemptCount = 0;
-
-                Span<Bitboard> occupancies = stackalloc Bitboard[4096];
-                Span<Bitboard> references = stackalloc Bitboard[4096];
-                Span<int> epoch = stackalloc int[4096];
-                epoch.Clear();
-
-                for (Square s = Square.a1; s <= Square.h8; s++)
-                {
-                    Bitboard irrelevant = ((Bitboard.Rank1 | Bitboard.Rank8) & ~s.GetRank().ToBitboard())
-                                        | ((Bitboard.FileA | Bitboard.FileH) & ~s.GetFile().ToBitboard());
-
-                    ref MagicStruct m = ref target[(int)s];
-                    m.mask = SliderAttacks(pt, s, 0) & ~irrelevant;
-                    m.shift = 64 - m.mask.PopulationCount();
-
-                    size = 0;
-                    Bitboard b = 0;
-
-                    //Carry rippler trick to enumerate all subsets
-                    do
-                    {
-                        occupancies[size] = b;
-                        references[size] = SliderAttacks(pt, s, b);
-
-                        size++;
-                        b = (ulong)b - m.mask & m.mask;
-                    } while (b != 0);
-
-                    m.attacks = new Bitboard[size];
-
-                    for (int i = 0; i < size;)
-                    {
-                        for (m.magic = 0; BitOperations.PopCount((ulong)m.mask * m.magic >> 56) < 6;)
-                            m.magic = random.SparseUInt64();
-
-                        for (attemptCount++, i = 0; i < size; i++)
-                        {
-                            int index = m.CalculateIndex(occupancies[i]);
-
-                            //Check to see if this index is already occupied in this run
-                            if (epoch[index] < attemptCount)
-                            {
-                                epoch[index] = attemptCount;
-                                m.attacks[index] = references[i];
-                            }
-                            //If occupied check to see if both conditions lead to same squares being attacked if not start again
-                            else if (m.attacks[index] != references[i])
-                                break;
-                        }
-                    }
-                }
-            }
-
-            private static Bitboard SliderAttacks(PieceType pt, Square square, Bitboard occupancy)
-            {
-                Bitboard attacks = 0;
-
-                Span<Direction> rookAttacks = stackalloc Direction[] { North, East, West, South };
-                Span<Direction> bishopAttacks = stackalloc Direction[] { NorthEast, NorthWest, SouthWest, SouthEast };
-
-                foreach (Direction d in pt == Rook ? rookAttacks : bishopAttacks)
-                {
-                    Square sq = square;
-
-                    while (sq.SafeStep(d) != 0 && (occupancy & sq.ToBitboard()) == 0)
-                        attacks |= (sq = sq.Shift(d)).ToBitboard();
-                }
-
-                return attacks;
-            }
-
-            static Magics()
-            {
-                CalculateMagics(Bishop, bishopMagics);
-                CalculateMagics(Rook, rookMagics);
-            }
-        }
-
         public struct BitboardEnumerator
         {
             private Bitboard bits;
@@ -148,7 +40,6 @@ namespace Chessour
             public BitboardEnumerator(Bitboard b)
             {
                 bits = b;
-                Current = 0;
             }
 
             public bool MoveNext()
@@ -162,6 +53,26 @@ namespace Chessour
                     return false;
             }
         }
+        struct MagicStruct
+        {
+            public Bitboard mask;
+            public ulong magic;
+            public int shift;
+            public Bitboard[] attacks;
+
+            public readonly int CalculateIndex(Bitboard occupancy)
+            {
+                return (int)((ulong)(occupancy & mask) * magic >> shift);
+            }
+
+            public readonly Bitboard GetAttack(Bitboard occupancy)
+            {
+                return attacks[(int)((ulong)(occupancy & mask) * magic >> shift)];
+            }
+        }
+
+        static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
+        static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
 
         static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
         static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
@@ -257,6 +168,7 @@ namespace Chessour
             return (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
         }
 
+
         public static Square PopSquare(ref Bitboard bitboard)
         {
             Square square = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit
@@ -295,8 +207,6 @@ namespace Chessour
 
         public static Bitboard Attacks(PieceType pieceType, Square square)
         {
-            Debug.Assert(pieceType.IsValid() && IsValid(square));
-
             Debug.Assert(pieceType != None && pieceType != Pawn, "Invalid piece type");
 
             return pseudoAttacks[(int)pieceType, (int)square];
@@ -307,9 +217,9 @@ namespace Chessour
         {
             return pt switch
             {
-                Bishop => Magics.bishopMagics[(int)s].GetAttack(occupancy),
-                Rook => Magics.rookMagics[(int)s].GetAttack(occupancy),
-                Queen => Magics.bishopMagics[(int)s].GetAttack(occupancy) | Magics.rookMagics[(int)s].GetAttack(occupancy),
+                Bishop => bishopMagics[(int)s].GetAttack(occupancy),
+                Rook => rookMagics[(int)s].GetAttack(occupancy),
+                Queen => bishopMagics[(int)s].GetAttack(occupancy) | rookMagics[(int)s].GetAttack(occupancy),
                 _ => Attacks(pt, s),
             };
         }
@@ -334,11 +244,88 @@ namespace Chessour
 
         static Bitboards()
         {
+            static void CalculateMagics(PieceType pt, MagicStruct[] target)
+            {
+                Random random = new(4661);
+
+                int size = 0;
+                int attemptCount = 0;
+
+                Span<Bitboard> occupancies = stackalloc Bitboard[4096];
+                Span<Bitboard> references = stackalloc Bitboard[4096];
+                Span<int> epoch = stackalloc int[4096];
+                epoch.Clear();
+
+                for (Square s = Square.a1; s <= Square.h8; s++)
+                {
+                    Bitboard irrelevant = ((Bitboard.Rank1 | Bitboard.Rank8) & ~s.GetRank().ToBitboard())
+                                        | ((Bitboard.FileA | Bitboard.FileH) & ~s.GetFile().ToBitboard());
+
+                    ref MagicStruct m = ref target[(int)s];
+                    m.mask = SliderAttacks(pt, s, 0) & ~irrelevant;
+                    m.shift = 64 - m.mask.PopulationCount();
+
+                    size = 0;
+                    Bitboard b = 0;
+
+                    //Carry rippler trick to enumerate all subsets
+                    do
+                    {
+                        occupancies[size] = b;
+                        references[size] = SliderAttacks(pt, s, b);
+
+                        size++;
+                        b = (ulong)b - m.mask & m.mask;
+                    } while (b != 0);
+
+                    m.attacks = new Bitboard[size];
+
+                    for (int i = 0; i < size;)
+                    {
+                        for (m.magic = 0; BitOperations.PopCount((ulong)m.mask * m.magic >> 56) < 6;)
+                            m.magic = random.SparseUInt64();
+
+                        for (attemptCount++, i = 0; i < size; i++)
+                        {
+                            int index = m.CalculateIndex(occupancies[i]);
+
+                            //Check to see if this index is already occupied in this run
+                            if (epoch[index] < attemptCount)
+                            {
+                                epoch[index] = attemptCount;
+                                m.attacks[index] = references[i];
+                            }
+                            //If occupied check to see if both conditions lead to same squares being attacked if not start again
+                            else if (m.attacks[index] != references[i])
+                                break;
+                        }
+                    }
+                }
+            }
+            static Bitboard SliderAttacks(PieceType pt, Square square, Bitboard occupancy)
+            {
+                Bitboard attacks = 0;
+
+                Span<Direction> rookAttacks = stackalloc Direction[] { North, East, West, South };
+                Span<Direction> bishopAttacks = stackalloc Direction[] { NorthEast, NorthWest, SouthWest, SouthEast };
+
+                foreach (Direction d in pt == Rook ? rookAttacks : bishopAttacks)
+                {
+                    Square sq = square;
+
+                    while (sq.SafeStep(d) != 0 && (occupancy & sq.ToBitboard()) == 0)
+                        attacks |= (sq = sq.Shift(d)).ToBitboard();
+                }
+
+                return attacks;
+            }
+
             for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
                 for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
                     distance[(int)s1, (int)s2] = Math.Max(Math.Abs(s1.GetFile() - s2.GetFile()), Math.Abs(s1.GetRank() - s2.GetRank()));
 
-            Magics.Init();
+            CalculateMagics(Bishop, bishopMagics);
+            CalculateMagics(Rook, rookMagics);
 
             for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
             {

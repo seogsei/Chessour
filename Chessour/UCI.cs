@@ -1,98 +1,109 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Text;
+using Chessour.Utilities;
 
 namespace Chessour
 {
     static class UCI
     {
+        public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";     
+     
+        public struct SearchLimits
+        {
+            public List<Move>? searchMoves;
+            public int whiteTime;
+            public int blackTime;
+            public int whiteIncrement;
+            public int blackIncrement;
+            public int movesToGo;
+            public Depth depth;
+            public int nodes;
+            public int mate;
+            public int moveTime;
+            public bool infinite;
+            
+            public int perft;
+        }
+
         public const int NormalizeToPawn = (int)Value.PawnMG;
 
-        public static void Run(string[] args)
+        public static void Loop(string[] args)
         {
-            Position position = new(FEN.StartPosition, new());
+            Position position = new(StartFEN, new());
 
             string command;
             do
             {
-                IEnumerator<string> enumerator;
-                if (args.Length == 0)
-                    enumerator = (Console.ReadLine() ?? "quit").Split(' ', options: StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).AsEnumerable().GetEnumerator();
-                else
-                    enumerator = args.AsEnumerable().GetEnumerator();
+                StringReader ss = args.Length == 0 ? new(Console.ReadLine() ?? "quit")
+                                                    : new(string.Join(' ', args));
 
-                command = enumerator.MoveNext() ? enumerator.Current : string.Empty;
+                ss.Extract(out command);
 
                 switch (command)
                 {
-                    case "quit":
-                    case "stop":
-                        Engine.Threads.Stop();
-                        break;
                     case "uci":
-                        const string uciString = $"""
-                                                id name {Engine.Name}
-                                                id author {Engine.Author}
-                                                uciok
-                                                """;
-                        Console.WriteLine(uciString);
+                        Console.WriteLine($"""
+                            id name {Engine.Name}
+                            id author {Engine.Author}
+                            uciok
+                            """);
                         break;
-                    case "go":
-                        Go(enumerator, position);
-                        break;
-                    case "position":
-                        Position(enumerator, position);
+                    case "debug":
                         break;
                     case "isready":
                         Console.WriteLine("readyok");
                         break;
+                    case "setoption":
+                        break;
+                    case "ucinewgame":
+                        break;
+                    case "position":
+                        Position(ref ss, position);
+                        break;
+                    case "go":
+                        Go(ref ss, position);
+                        break;
+                    case "quit":
+                    case "stop":
+                        Engine.Threads.Stop();
+                        break;
+                    case "ponderhit":
+                        break;
                     case "bench":
-                        Bench(enumerator, position);
+                        Bench(ref ss, position);
                         break;
                     case "eval":
                         Eval(position);
                         break;
                     default:
-                        Console.WriteLine("Unrecognized command");
+                        Console.WriteLine($"Unrecognized command: {command}");
                         break;
                 }
 
             } while (command != "quit" && args.Length == 0);
         }
 
-        private static void Position(IEnumerator<string> enumerator, Position position)
+        static void Position(ref StringReader ss, Position position)
         {
-            string token = enumerator.MoveNext() ? enumerator.Current : string.Empty;
-
+            ss.Extract(out string token);
+            
             string fen;
             if (token == "startpos")
             {
-                fen = FEN.StartPosition;
-                enumerator.MoveNext();
+                fen = StartFEN;
+                ss.Extract(out string _);
             }
             else if (token == "fen")
-            {
-                StringBuilder sb = new(100);
-
-                while (enumerator.MoveNext())
-                {
-                    if (enumerator.Current == "moves") break;
-
-                    sb.Append(enumerator.Current);
-                    sb.Append(' ');
-                }
-
-                fen = sb.ToString();
-            }
+                fen = ss.ReadUntil("moves");
             else
                 return;
 
             position.Set(fen, new());
 
             //Handle Moves
-            while (enumerator.MoveNext())
+            while (ss.Extract(out token))
             {
-                Move m = ParseMove(position, enumerator.Current);
+                Move m = ParseMove(position, token);
                 if (m != Move.None)
                     position.MakeMove(m, new Position.StateInfo());
                 else
@@ -100,46 +111,73 @@ namespace Chessour
             }
         }
 
-        private static void Go(IEnumerator<string> enumerator, Position position)
+        static void Go(ref StringReader ss, Position position)
         {
-            SearchObject.SearchLimits limits = new();
+            SearchLimits limits = new();
             bool ponder = false;
 
-            while (enumerator.MoveNext())
-                switch (enumerator.Current)
+            while (ss.Extract(out string token))
+                switch (token)
                 {
                     case "searchmoves":
                         limits.searchMoves = new();
-                        while (enumerator.MoveNext())
-                            limits.searchMoves.Add(ParseMove(position, enumerator.Current));
+                        while (ss.Extract(out token))
+                            limits.searchMoves.Add(ParseMove(position, token));
                         break;
                     case "ponder":
                         ponder = true;
                         break;
+                    case "wtime":
+                        ss.Extract(out limits.whiteTime);
+                        break;
+                    case "btime":
+                        ss.Extract(out limits.blackTime);
+                        break;
+                    case "winc":
+                        ss.Extract(out limits.whiteIncrement);
+                        break;
+                    case "binc":
+                        ss.Extract(out limits.blackIncrement);
+                        break;
+                    case "movestogo":
+                        ss.Extract(out limits.movesToGo);
+                        break;
                     case "depth":
-                        limits.depth = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
+                        ss.Extract(out limits.depth);
+                        break;
+                    case "nodes":
+                        ss.Extract(out limits.nodes);
+                        break;
+                    case "mate":
+                        ss.Extract(out limits.mate);
+                        break;
+                    case "movetime":
+                        ss.Extract(out limits.moveTime);
+                        break;
+                    case "infinite":
+                        limits.infinite = true;
                         break;
                     case "perft":
-                        limits.perft = enumerator.MoveNext() ? int.Parse(enumerator.Current) : 0;
+                        ss.Extract(out limits.perft);
                         break;
                 }
 
-            Engine.Threads.StartThinking(position, limits, ponder);
+            Engine.Threads.StartThinking(position, in limits, ponder);
         }
 
-        private static void Bench(IEnumerator<string> enumerator, Position position)
+        static void Bench(ref StringReader ss, Position position)
         {
             ulong nodes = 0;
 
             long elapsed = Engine.Now();
-            string token = enumerator.MoveNext() ? enumerator.Current : string.Empty;
+            ss.Extract(out string token);
 
 
             if (token == "go")
-            {
+            {              
                 Console.WriteLine($"\nPosition ({position.FEN()})");
 
-                Go(enumerator, position);
+                Go(ref ss, position);
 
                 Engine.Threads.WaitForSeachFinish();
                 nodes += Engine.Threads.NodesSearched();
@@ -148,19 +186,21 @@ namespace Chessour
 
             elapsed = Engine.Now() - elapsed + 1;
 
-            Console.WriteLine();
-            Console.WriteLine($"Total time (ms) : {elapsed}");
-            Console.WriteLine($"Nodes searched : {nodes}");
-            Console.WriteLine($"Nps : {1000 * nodes / (ulong)elapsed}");
+            Console.WriteLine($"""
+
+                Total time (ms) : {elapsed}
+                Nodes searched : {nodes}
+                Nps : {1000 * nodes / (ulong)elapsed}
+                """);
         }
       
-        private static void Eval(Position position)
+        static void Eval(Position position)
         {
             Evaluation.Evaluate(position, true);
 
             Console.WriteLine(Evaluation.Trace.ToString());
         }
-
+    
         public static string ParsePV(Move[] pv)
         {
             StringBuilder sb = new(1024);
@@ -170,7 +210,7 @@ namespace Chessour
             {
                 if (i != 0)
                     sb.Append(' ');
-                sb.Append(ToString(pv[i]));
+                sb.Append(pv[i].LongAlgebraicNotation());
             }
 
             return sb.ToString();
@@ -178,34 +218,34 @@ namespace Chessour
 
         public static Move ParseMove(Position position, string str)
         {
-            MoveList moveList = new(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
+            MoveList moveList = new(position, stackalloc MoveScore[MAX_MOVE_COUNT]);
 
             foreach (Move m in moveList)
-                if (str == ToString(m))
+                if (str == m.LongAlgebraicNotation())
                     return m;
 
             return Move.None;
         }
 
-        public static string ToString(Move m)
+        public static string LongAlgebraicNotation(this Move move)
         {
-            Square from = m.FromSquare();
-            Square to = m.ToSquare();
+            Square from = move.FromSquare();
+            Square to = move.ToSquare();
 
-            if (m == Move.None)
+            if (move == Move.None)
                 return "(none)";
 
-            if (m == Move.Null)
+            if (move == Move.Null)
                 return "0000";
 
-            if (m.TypeOf() == MoveType.Castling)
+            if (move.TypeOf() == MoveType.Castling)
                 to = MakeSquare(to > from ? File.g : File.c, from.GetRank());
 
-            string move = string.Concat(from, to);
-            if (m.TypeOf() == MoveType.Promotion)
-                move += " pnbrqk"[(int)m.PromotionPiece()];
+            string moveString = string.Concat(from, to);
+            if (move.TypeOf() == MoveType.Promotion)
+                moveString += " pnbrqk"[(int)move.PromotionPiece()];
 
-            return move;
+            return moveString;
         }
 
         public static string ToString(Value v)

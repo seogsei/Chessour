@@ -37,58 +37,78 @@
         SouthWest = South + West
     }
 
-    static partial class CoreFunctions
+    static partial class Core
     {
         public static bool IsValid(Square square)
         {
             return square >= Square.a1 && square <= Square.h8;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square MakeSquare(File file, Rank rank)
         {
-            return (Square)(((int)rank << 3) | (int)file);
+            return (Square)(((int)rank << 3) + (int)file);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static File GetFile(this Square square)
         {
             return (File)((int)square & 7);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Rank GetRank(this Square square)
         {
             return (Rank)((int)square >> 3);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square Shift(this Square square, Direction direction)
         {
             return square + (int)direction;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square NegativeShift(this Square square, Direction direction)
         {
             return square - (int)direction;
         }
 
-        public static Rank RelativeTo(this Rank r, Color c)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Rank RelativeTo(this Rank rank, Color side)
         {
-            return c == Color.White ? r : 7 - r;
+            return rank ^ (Rank)(7 * (int)side);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square RelativeTo(this Square square, Color side)
         {
             return square ^ (Square)(56 * (int)side);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square FlipRank(this Square square)
         {
             return square ^ Square.a8;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Square FlipFile(this Square square)
+        {
+            return square ^ Square.h1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Direction PawnPush(Color side)
+        {
+            return side == Color.White ? Direction.North : Direction.South;
         }
 
         public static int EdgeDistance(this File file)
         {
             return Math.Min((int)file, (int)File.h - (int)file);
         }
-
+     
         public static int EdgeDistance(this Rank rank)
         {
             return Math.Min((int)rank, (int)Rank.R8 - (int)rank);

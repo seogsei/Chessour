@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 
 namespace Chessour
@@ -10,7 +9,7 @@ namespace Chessour
 
         public void Stop()
         {
-            Master.Search.Stop = true;
+            Master.SearchObject.Stop = true;
         }
 
         public void WaitForSeachFinish() 
@@ -22,7 +21,7 @@ namespace Chessour
         {
             ulong total = 0;
             foreach (var thread in this)
-                total += thread.Nodes;
+                total += thread.SearchObject.stats.nodeCount;
 
             return total;
         }
@@ -54,24 +53,13 @@ namespace Chessour
             }
         }
 
-        public void StartThinking(Position pos, in SearchObject.SearchLimits limits, bool ponder)
+        public void StartThinking(Position position, in UCI.SearchLimits limits, bool ponder)
         {
             Master.WaitForSearchFinish();
 
-            MoveList moves = new(pos, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
-
             foreach (SearchThread th in this)
             {
-                th.Search.Stop = false;
-                th.Search.limits = limits;
-                th.rootDepth = 0;
-                th.Search.rootMoves.Clear();
-                th.Search.Reset();
-                foreach (Move m in moves)
-                    if (limits.searchMoves is null || limits.searchMoves.Contains(m))
-                        th.Search.rootMoves.Add(m);
-
-                th.RootPosition.Set(pos, th.RootStateInfo);
+                th.SearchObject.SetUpSearchParameters(position, in limits);
             }
 
             Master.Release();
@@ -79,30 +67,19 @@ namespace Chessour
     }
 
     class SearchThread
-    {
-        public Position RootPosition { get; }
-        public Position.StateInfo RootStateInfo { get; }
-        public SearchObject Search { get; }
+    {     
+        public Search SearchObject { get; }
         public bool Searching { get; private set; }
-        public bool Stop { get => Search.Stop; set => Search.Stop = value; }
         public bool Exit { get; private set; }
-        public ulong Nodes { get; protected set; }
-
-
-        public int rootDepth;
-        public Move lastBestMove;
-        public Value bestValue;
 
         readonly Thread thread;
         readonly Mutex mutex;
 
         public SearchThread()
         {
-            RootPosition = new Position(RootStateInfo = new Position.StateInfo());
-            Search = new();
+            SearchObject = new();
 
             mutex = new(false);
-
             Searching = true;
 
             thread = new Thread(IdleLoop);
@@ -157,36 +134,7 @@ namespace Chessour
        
         protected virtual void StartSearch()
         {
-            Value alpha, beta;
-
-            bestValue = alpha = Value.Min;
-            beta = Value.Max;
-
-            while (++rootDepth < SearchObject.MaxDepth
-                && !Stop
-                && !(Search.limits.depth > 0 && rootDepth > Search.limits.depth))
-            {
-                foreach (var rm in Search.rootMoves)
-                    rm.PreviousScore = rm.Score;
-
-                bestValue = Search.Search(NodeType.Root, RootPosition, 0, alpha, beta, rootDepth);
-
-                if (Stop)
-                    break;
-
-                Debug.Assert(alpha >= Value.Min && beta <= Value.Max);
-
-                Search.rootMoves.Sort();
-
-                if ((MasterSearchThread)this is not null
-                    && !Stop)
-                    Console.WriteLine($"info depth {rootDepth} score {UCI.ToString(bestValue)} nodes {Search.NodeCount} qnodes {Search.QNodeCount} pv {UCI.ParsePV(Search.rootMoves.First().pv)}");
-            }
-
-            if (Search.rootMoves[0].Move != lastBestMove)
-            {
-                lastBestMove = Search.rootMoves[0].Move;
-            }
+            SearchObject.StartSearch();
         }
     }
     class MasterSearchThread : SearchThread
@@ -196,31 +144,25 @@ namespace Chessour
         public MasterSearchThread(SearchPool owner) : base()
         {
             pool = owner;
+            SearchObject.SendInfo = true;
         }
 
         protected override void StartSearch()
         {
-            if (Search.limits.perft > 0)
+            if (SearchObject.limits.perft > 0)
             {
-                Nodes = Search.Perft(RootPosition, Search.limits.perft);
-
-                Console.WriteLine("\nNodes searched: " + Nodes + "\n");
+                SearchObject.StartSearch();
                 return;
             }
 
-            if (Search.rootMoves.Count == 0)
-            {
-                Console.WriteLine("info depth 0 score " + (RootPosition.IsCheck() ? Value.Mated : Value.Draw));
-            }
-            else
-            {
-                foreach (var th in pool)
-                    if (th != this)
-                        th.Release();
+            foreach (var th in pool)
+                if (th != this)
+                    th.Release();
 
-                base.StartSearch();
-            }
+            //Start searching on this thread
+            SearchObject.StartSearch();
 
+            //Wait for other searches to finish
             foreach (var th in pool)
                 if (th != this)
                     th.WaitForSearchFinish();
@@ -228,7 +170,7 @@ namespace Chessour
             //Find the best thread
             SearchThread bestThread = this;
 
-            Console.WriteLine($"info bestmove {UCI.ToString(bestThread.Search.rootMoves[0].Move)} ponder {UCI.ToString(bestThread.Search.rootMoves[0].Refutation)}");
+            Console.WriteLine($"info bestmove {bestThread.SearchObject.rootMoves[0].pv[0].LongAlgebraicNotation()} ponder {bestThread.SearchObject.rootMoves[0].pv[1].LongAlgebraicNotation()}");
         }
     }
 }

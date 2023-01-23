@@ -1,11 +1,5 @@
 ﻿namespace Chessour.Types
 {
-    public enum Move
-    {
-        None,
-        Null = 65
-    }
-
     public enum MoveType
     {
         Quiet,
@@ -14,46 +8,62 @@
         Castling = 3 << 14
     }
 
-    static partial class CoreFunctions
+    public readonly struct MoveStruct
     {
-        public static Move MakeMove(Square from, Square to)
+        public int Value { get; }
+
+        public Square From{ get => (Square)((Value >> 6) & 0x3f); }
+        public Square To{ get => (Square)((Value >> 6)); }
+        public MoveType Tyoe { get => (MoveType)(Value & (3 << 14)); }
+
+        public MoveStruct(Square from, Square to, MoveType type = MoveType.Quiet, PieceType promotion = PieceType.Knight)
         {
-            return (Move)(((int)from << 6) | (int)to);
+            Value = (int)type | ((int)(promotion - 2) << 12) | ((int)from << 6) | (int)to;
+        }
+    }
+    
+    public enum Move
+    {
+        None,
+        Null = 65
+    }
+
+    static partial class Core
+    {
+        public static bool IsValid(Move move)
+        {
+            return move.FromSquare() != move.ToSquare();
         }
 
-        public static Move MakeCastlingMove(Square kingSquare, Square rookSquare)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Move MakeMove(Square from, Square to, MoveType type = MoveType.Quiet, PieceType promotion = PieceType.Knight)
         {
-            return (Move)((int)MoveType.Castling | ((int)kingSquare << 6) | (int)rookSquare);
+            return (Move)((int)type | ((int)(promotion - 2) << 12) | ((int)from << 6) | (int)to);
         }
 
-        public static Move MakeEnPassantMove(Square from, Square enPassantSquare)
-        {
-            return (Move)((int)MoveType.EnPassant | ((int)from << 6) | (int)enPassantSquare);
-        }
-
-        public static Move MakePromotionMove(Square from, Square to, PieceType promotionPiece)
-        {
-            return (Move)((int)MoveType.Promotion | ((int)(promotionPiece - 2) << 12) | ((int)from << 6) | (int)to);
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square FromSquare(this Move move)
         {
             return (Square)(((int)move >> 6) & 0x3F);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square ToSquare(this Move move)
         {
             return (Square)((int)move & 0x3F);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static MoveType TypeOf(this Move move)
         {
             return (MoveType)((int)move & (3 << 14));
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static PieceType PromotionPiece(this Move move)
         {
             return (PieceType)(((int)move >> 12) & 3) + 2;
         }
     }
+    
 }

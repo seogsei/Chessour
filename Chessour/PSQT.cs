@@ -117,10 +117,10 @@ namespace Chessour
 
                 for (Square s = Square.a1; s <= Square.h8; s++)
                 {
-                    psqt[(int)pc, (int)s] = pieceScore + (CoreFunctions.GetPieceType(pc) == PieceType.Pawn ? bonuses[(int)pc][(int)s.GetRank()][(int)s.GetFile()]
+                    psqt[(int)pc, (int)s] = pieceScore + (Core.GetPieceType(pc) == PieceType.Pawn ? bonuses[(int)pc][(int)s.GetRank()][(int)s.GetFile()]
                                                                                                            : bonuses[(int)pc][(int)s.GetRank()][s.GetFile().EdgeDistance()]);
 
-                    psqt[(int)pc.Opposite(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
+                    psqt[(int)pc.Flip(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
 
                 }
             }

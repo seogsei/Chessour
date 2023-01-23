@@ -4,26 +4,6 @@ using static Chessour.Types.PieceType;
 
 namespace Chessour
 {
-    public enum Value
-    {
-        Zero = 0,
-        Draw = 0,
-        KnownWin = MateInMaxPly - 1,
-        MateInMaxPly = Mate - SearchObject.MaxPly,
-        Mate = 32000,
-        Max = 32001,
-
-        KnownLoss = -KnownWin,
-        Mated = -Mate,
-        Min = -Max,
-
-        PawnMG = 100, PawnEG = 110,
-        KnightMG = 300, KnightEG = 300,
-        BishopMG = 300, BishopEG = 300,
-        RookMG = 440, RookEG = 480,
-        QueenMG = 890, QueenEG = 950,
-    }
-
     public readonly struct Score
     {
         readonly short midGame;
@@ -61,10 +41,7 @@ namespace Chessour
 
     public static class Evaluation
     {
-        public static Value Negate(this Value value)
-        {
-            return (Value)(-(int)value);
-        }
+
         static Score S(int mg, int eg) => new(mg, eg);
 
         internal static class Trace
@@ -197,14 +174,14 @@ namespace Chessour
 
             while (true)
             {
-                side = side.Opposite();
+                side = side.Flip();
                 attackers &= occupied;
 
                 if ((sideAttackers = attackers & position.Pieces(side)) == 0)
                     break;
 
 
-                if ((position.Pinners(side.Opposite()) & occupied) != 0)
+                if ((position.Pinners(side.Flip()) & occupied) != 0)
                 {
                     sideAttackers &= ~position.BlockersForKing(side);
 

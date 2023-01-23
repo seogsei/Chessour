@@ -27,6 +27,7 @@ namespace Chessour
         {
             Generate(position);
         }
+        
         public MoveList(GenerationType type, Position position, Span<MoveScore> buffer) : this(buffer)
         {
             Generate(type, position);
@@ -36,6 +37,7 @@ namespace Chessour
         {
             Count = MoveGenerator.Generate(position, moves, Count);
         }
+
         public void Generate(GenerationType type, Position position)
         {
             Count = MoveGenerator.Generate(type, position, moves, Count);
@@ -77,22 +79,22 @@ namespace Chessour
     {
         public const int MaxMoveCount = 218;
 
-        public static int Generate(Position position, Span<MoveScore> moveList, int start = 0)
+        public static int Generate(Position position, Span<MoveScore> buffer, int start = 0)
         {
             Color us = position.ActiveColor;
             Bitboard pinned = position.BlockersForKing(us) & position.Pieces(us);
             Square ksq = position.KingSquare(us);
 
-            int end = position.IsCheck() ? Generate(Evasions, position, moveList, start)
-                                    : Generate(NonEvasions, position, moveList, start);
+            int end = position.IsCheck() ? Generate(Evasions, position, buffer, start)
+                                    : Generate(NonEvasions, position, buffer, start);
 
             for (; start < end; start++)
             {
-                Move m = moveList[start].Move;
+                Move m = buffer[start].Move;
 
                 if (((pinned != 0 && (pinned & m.FromSquare().ToBitboard()) != 0) || m.FromSquare() == ksq || m.TypeOf() == MoveType.EnPassant)
                     && !position.IsLegal(m))
-                    moveList[start--] = moveList[--end].Move;
+                    buffer[start--] = buffer[--end].Move;
                 else
                     continue;
             }
@@ -100,7 +102,7 @@ namespace Chessour
             return end;
         }
 
-        public static int Generate(GenerationType type, Position position, Span<MoveScore> moveList, int start = 0)
+        public static int Generate(GenerationType type, Position position, Span<MoveScore> buffer, int start = 0)
         {
             Color us = position.ActiveColor;
             Square ksq = position.KingSquare(us);
@@ -108,54 +110,54 @@ namespace Chessour
 
             Bitboard targetSquares = type == Evasions ? Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers
                                : type == NonEvasions ? ~position.Pieces(us)
-                               : type == Captures ? position.Pieces(us.Opposite())
+                               : type == Captures ? position.Pieces(us.Flip())
                                : ~position.Pieces();
             if (type != Evasions || !position.Checkers.MoreThanOne())
             {
-                start = us == Color.White ? GenerateWhitePawnMoves(type, position, targetSquares, moveList, start)
-                                          : GenerateBlackPawnMoves(type, position, targetSquares, moveList, start);
-                start = GenerateKnightMoves(us, position, targetSquares, moveList, start);
-                start = GeneratePieceMoves(PieceType.Bishop, us, position, targetSquares, occupancy, moveList, start);
-                start = GeneratePieceMoves(PieceType.Rook, us, position, targetSquares, occupancy, moveList, start);
-                start = GeneratePieceMoves(PieceType.Queen, us, position, targetSquares, occupancy, moveList, start);
+                start = us == Color.White ? GenerateWhitePawnMoves(type, position, targetSquares, buffer, start)
+                                          : GenerateBlackPawnMoves(type, position, targetSquares, buffer, start);
+                start = GeneratePieceMoves(PieceType.Knight, us, position, targetSquares, occupancy, buffer, start);
+                start = GeneratePieceMoves(PieceType.Bishop, us, position, targetSquares, occupancy, buffer, start);
+                start = GeneratePieceMoves(PieceType.Rook, us, position, targetSquares, occupancy, buffer, start);
+                start = GeneratePieceMoves(PieceType.Queen, us, position, targetSquares, occupancy, buffer, start);
             }
 
             //King moves
             Bitboard kingAttacks = Attacks(PieceType.King, ksq) & (type == Evasions ? ~position.Pieces(us) : targetSquares);
 
             foreach (Square attack in kingAttacks)
-                moveList[start++] = MakeMove(ksq, attack);
+                buffer[start++] = MakeMove(ksq, attack);
 
             if ((type == Quiets || type == NonEvasions) && position.CanCastle(MakeCastlingRight(us, CastlingRight.All)))
             {
                 CastlingRight kingSide = MakeCastlingRight(us, CastlingRight.KingSide);
                 if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                    moveList[start++] = MakeCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                    buffer[start++] = MakeMove(ksq, position.CastlingRookSquare(kingSide), MoveType.Castling);
 
                 CastlingRight queenSide = MakeCastlingRight(us, CastlingRight.QueenSide);
                 if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                    moveList[start++] = MakeCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                    buffer[start++] = MakeMove(ksq, position.CastlingRookSquare(queenSide), MoveType.Castling);
             }
 
             return start;
         }
 
-        private static int GeneratePromotions(GenerationType type, Square from, Square to, Span<MoveScore> moveList, int start)
+        private static int GeneratePromotions(GenerationType type, Square from, Square to, Span<MoveScore> buffer, int start)
         {
             if (type == Captures || type == Evasions || type == NonEvasions)
-                moveList[start++] = MakePromotionMove(from, to, PieceType.Queen);
+                buffer[start++] = MakeMove(from, to, MoveType.Promotion, PieceType.Queen);
 
             if (type == Quiets || type == Evasions || type == NonEvasions)
             {
-                moveList[start++] = MakePromotionMove(from, to, PieceType.Rook);
-                moveList[start++] = MakePromotionMove(from, to, PieceType.Bishop);
-                moveList[start++] = MakePromotionMove(from, to, PieceType.Knight);
+                buffer[start++] = MakeMove(from, to, MoveType.Promotion, PieceType.Rook);
+                buffer[start++] = MakeMove(from, to, MoveType.Promotion, PieceType.Bishop);
+                buffer[start++] = MakeMove(from, to, MoveType.Promotion, PieceType.Knight);
             }
 
             return start;
         }
 
-        private static int GenerateWhitePawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
+        private static int GenerateWhitePawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> buffer, int start)
         {
             const Color us = Color.White;
             const Color enemy = Color.Black;
@@ -187,10 +189,10 @@ namespace Chessour
                 }
 
                 foreach (Square to in push1)
-                    moveList[start++] = MakeMove(to.NegativeShift(Up), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(Up), to);
 
                 foreach (Square to in push2)
-                    moveList[start++] = MakeMove(to.NegativeShift(Up).NegativeShift(Up), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(Up).NegativeShift(Up), to);
             }
 
             //Promotions
@@ -204,13 +206,13 @@ namespace Chessour
                 Bitboard captureLeft = promotionPawns.ShiftNorthWest() & enemies;
 
                 foreach (Square to in push)
-                    start = GeneratePromotions(type, to.NegativeShift(Up), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(Up), to, buffer, start);
 
                 foreach (Square to in captureRight)
-                    start = GeneratePromotions(type, to.NegativeShift(UpRight), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(UpRight), to, buffer, start);
 
                 foreach (Square to in captureLeft)
-                    start = GeneratePromotions(type, to.NegativeShift(UpLeft), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(UpLeft), to, buffer, start);
             }
 
 
@@ -221,10 +223,10 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftNorthWest() & enemies;
 
                 foreach (Square to in captureRight)
-                    moveList[start++] = MakeMove(to.NegativeShift(UpRight), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(UpRight), to);
 
                 foreach (Square to in captureLeft)
-                    moveList[start++] = MakeMove(to.NegativeShift(UpLeft), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(UpLeft), to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
@@ -234,13 +236,13 @@ namespace Chessour
                     Bitboard epCandidates = pawns & PawnAttacks(enemy, position.EnPassantSquare);
 
                     foreach (Square from in epCandidates)
-                        moveList[start++] = MakeEnPassantMove(from, position.EnPassantSquare);
+                        buffer[start++] = MakeMove(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
             }
             return start;
         }
-
-        private static int GenerateBlackPawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> moveList, int start)
+      
+        private static int GenerateBlackPawnMoves(GenerationType type, Position position, Bitboard targets, Span<MoveScore> buffer, int start)
         {
             const Color us = Color.Black;
             const Color enemy = Color.White;
@@ -272,10 +274,10 @@ namespace Chessour
                 }
 
                 foreach (Square to in push1)
-                    moveList[start++] = MakeMove(to.NegativeShift(Up), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(Up), to);
 
                 foreach (Square to in push2)
-                    moveList[start++] = MakeMove(to.NegativeShift(Up).NegativeShift(Up), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(Up).NegativeShift(Up), to);
             }
 
             //Promotions
@@ -289,13 +291,13 @@ namespace Chessour
                 Bitboard captureLeft = promotionPawns.ShiftSouthEast() & enemies;
 
                 foreach (Square to in push)
-                    start = GeneratePromotions(type, to.NegativeShift(Up), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(Up), to, buffer, start);
 
                 foreach (Square to in captureRight)
-                    start = GeneratePromotions(type, to.NegativeShift(UpRight), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(UpRight), to, buffer, start);
 
                 foreach (Square to in captureLeft)
-                    start = GeneratePromotions(type, to.NegativeShift(UpLeft), to, moveList, start);
+                    start = GeneratePromotions(type, to.NegativeShift(UpLeft), to, buffer, start);
             }
 
 
@@ -306,10 +308,10 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftSouthEast() & enemies;
 
                 foreach (Square to in captureRight)
-                    moveList[start++] = MakeMove(to.NegativeShift(UpRight), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(UpRight), to);
 
                 foreach (Square to in captureLeft)
-                    moveList[start++] = MakeMove(to.NegativeShift(UpLeft), to);
+                    buffer[start++] = MakeMove(to.NegativeShift(UpLeft), to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
@@ -319,26 +321,19 @@ namespace Chessour
                     Bitboard epCandidates = pawns & PawnAttacks(enemy, position.EnPassantSquare);
 
                     foreach (Square from in epCandidates)
-                        moveList[start++] = MakeEnPassantMove(from, position.EnPassantSquare);
+                        buffer[start++] = MakeMove(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
             }
             return start;
         }
 
-        private static int GenerateKnightMoves(Color us, Position position, Bitboard targetSquares, Span<MoveScore> moveList, int start)
+        private static int GeneratePieceMoves(PieceType pieceType, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> buffer, int start)
         {
-            foreach (Square knightSqr in position.Pieces(us, PieceType.Knight))
-                foreach (Square attack in Attacks(PieceType.Knight, knightSqr) & targetSquares)
-                    moveList[start++] = MakeMove(knightSqr, attack);
+            Bitboard pieces = position.Pieces(us, pieceType);
 
-            return start;
-        }
-
-        private static int GeneratePieceMoves(PieceType pt, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> moveList, int start)
-        {
-            foreach (Square pieces in position.Pieces(us, pt))
-                foreach (Square attack in Attacks(pt, pieces, occupiedSquares) & targetSquares)
-                    moveList[start++] = MakeMove(pieces, attack);
+            foreach (Square pieceSquare in position.Pieces(us, pieceType))
+                foreach (Square attackSquare in Attacks(pieceType, pieceSquare, occupiedSquares) & targetSquares)
+                    buffer[start++] = MakeMove(pieceSquare, attackSquare);
 
             return start;
         }

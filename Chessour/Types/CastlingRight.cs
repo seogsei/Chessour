@@ -18,11 +18,12 @@
         NB
     }
 
-    public static partial class CoreFunctions
+    public static partial class Core
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static CastlingRight MakeCastlingRight(Color side, CastlingRight cr)
         {
-            return cr & (CastlingRight)((int)CastlingRight.WhiteSide << (2 * (int)side));
+            return (side == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide) & cr;
         }
     }
 }
