@@ -1,6 +1,6 @@
 ﻿namespace Chessour.Types
 {
-    public static partial class CoreFunctions
+    public static partial class Core
     {
         public static ulong NextUInt64(this Random random)
         {

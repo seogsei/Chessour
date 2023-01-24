@@ -1,5 +1,6 @@
 ﻿namespace Chessour.Types
 {
+    [Flags]
     public enum CastlingRight
     {
         None = 0,
@@ -18,11 +19,12 @@
         NB
     }
 
-    public static partial class CoreFunctions
+    static partial class Core
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static CastlingRight MakeCastlingRight(Color side, CastlingRight cr)
         {
-            return cr & (CastlingRight)((int)CastlingRight.WhiteSide << (2 * (int)side));
+            return (side == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide) & cr;
         }
     }
 }

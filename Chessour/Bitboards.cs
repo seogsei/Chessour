@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Chessour.Types;
 
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
@@ -32,31 +33,17 @@ namespace Chessour
 
     static class Bitboards
     {
-        static class Magics
+        static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
+        static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
+
+        static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
+        static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
+        static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
+        static readonly Bitboard[,] pseudoAttacks = new Bitboard[(int)PieceType.NB, (int)Square.NB];
+
+        static Bitboards()
         {
-            public struct MagicStruct
-            {
-                public Bitboard mask;
-                public ulong magic;
-                public int shift;
-                public Bitboard[] attacks;
-
-                public readonly int CalculateIndex(Bitboard occupancy)
-                {
-                    return (int)((ulong)(occupancy & mask) * magic >> shift);
-                }
-                public readonly Bitboard GetAttack(Bitboard occupancy)
-                {
-                    return attacks[CalculateIndex(occupancy)];
-                }
-            }
-
-            public static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
-            public static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
-
-            public static void Init() { }
-
-            private static void CalculateMagics(PieceType pt, MagicStruct[] target)
+            static void CalculateMagics(PieceType pt, MagicStruct[] target)
             {
                 Random random = new(4661);
 
@@ -114,8 +101,7 @@ namespace Chessour
                     }
                 }
             }
-
-            private static Bitboard SliderAttacks(PieceType pt, Square square, Bitboard occupancy)
+            static Bitboard SliderAttacks(PieceType pt, Square square, Bitboard occupancy)
             {
                 Bitboard attacks = 0;
 
@@ -133,40 +119,37 @@ namespace Chessour
                 return attacks;
             }
 
-            static Magics()
+            for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
+                for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
+                    distance[(int)s1, (int)s2] = Math.Max(Math.Abs(s1.GetFile() - s2.GetFile()), Math.Abs(s1.GetRank() - s2.GetRank()));
+
+            CalculateMagics(Bishop, bishopMagics);
+            CalculateMagics(Rook, rookMagics);
+
+            for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
             {
-                CalculateMagics(Bishop, bishopMagics);
-                CalculateMagics(Rook, rookMagics);
+                pseudoAttacks[(int)White, (int)s1] = s1.SafeStep(NorthEast) | s1.SafeStep(NorthWest); //White pawn attacks
+                pseudoAttacks[(int)Black, (int)s1] = s1.SafeStep(SouthEast) | s1.SafeStep(SouthWest); //Black pawn attacks
+
+                foreach (Direction d in stackalloc[] { (Direction)17, (Direction)15, (Direction)10, (Direction)6, (Direction)(-6), (Direction)(-10), (Direction)(-15), (Direction)(-17) })
+                    pseudoAttacks[(int)Knight, (int)s1] |= s1.SafeStep(d); //>Knight
+
+                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Bishop, (int)s1] = Attacks(Bishop, s1, 0); //Bishop
+                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Rook, (int)s1] = Attacks(Rook, s1, 0); //Rook
+
+                foreach (Direction d in stackalloc[] { North, East, West, South, NorthEast, NorthWest, SouthEast, SouthWest })
+                    pseudoAttacks[(int)King, (int)s1] |= s1.SafeStep(d); //King
+
+
+                foreach (PieceType pt in stackalloc[] { Bishop, Rook })
+                    for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
+                        if ((pseudoAttacks[(int)pt, (int)s1] & s2.ToBitboard()) != 0)
+                        {
+                            line[(int)s1, (int)s2] = Attacks(pt, s1, 0) & Attacks(pt, s2, 0) | s1.ToBitboard() | s2.ToBitboard();
+                            between[(int)s1, (int)s2] = Attacks(pt, s1, s2.ToBitboard()) & Attacks(pt, s2, s1.ToBitboard());
+                        }
             }
         }
-
-        public struct BitboardEnumerator
-        {
-            private Bitboard bits;
-            public Square Current { get; private set; }
-
-            public BitboardEnumerator(Bitboard b)
-            {
-                bits = b;
-                Current = 0;
-            }
-
-            public bool MoveNext()
-            {
-                if (bits != 0)
-                {
-                    Current = PopSquare(ref bits);
-                    return true;
-                }
-                else
-                    return false;
-            }
-        }
-
-        static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] pseudoAttacks = new Bitboard[(int)PieceType.NB, (int)Square.NB];
 
         public static int Distance(Square s1, Square s2)
         {
@@ -295,8 +278,6 @@ namespace Chessour
 
         public static Bitboard Attacks(PieceType pieceType, Square square)
         {
-            Debug.Assert(pieceType.IsValid() && IsValid(square));
-
             Debug.Assert(pieceType != None && pieceType != Pawn, "Invalid piece type");
 
             return pseudoAttacks[(int)pieceType, (int)square];
@@ -307,9 +288,9 @@ namespace Chessour
         {
             return pt switch
             {
-                Bishop => Magics.bishopMagics[(int)s].GetAttack(occupancy),
-                Rook => Magics.rookMagics[(int)s].GetAttack(occupancy),
-                Queen => Magics.bishopMagics[(int)s].GetAttack(occupancy) | Magics.rookMagics[(int)s].GetAttack(occupancy),
+                Bishop => bishopMagics[(int)s].GetAttack(occupancy),
+                Rook => rookMagics[(int)s].GetAttack(occupancy),
+                Queen => bishopMagics[(int)s].GetAttack(occupancy) | rookMagics[(int)s].GetAttack(occupancy),
                 _ => Attacks(pt, s),
             };
         }
@@ -329,39 +310,43 @@ namespace Chessour
             return (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
         }
 
-
-        public static void Init() { }
-
-        static Bitboards()
+        public struct BitboardEnumerator
         {
-            for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
-                for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
-                    distance[(int)s1, (int)s2] = Math.Max(Math.Abs(s1.GetFile() - s2.GetFile()), Math.Abs(s1.GetRank() - s2.GetRank()));
+            private Bitboard bits;
+            public Square Current { get; private set; }
 
-            Magics.Init();
-
-            for (Square s1 = Square.a1; s1 <= Square.h8; s1++)
+            public BitboardEnumerator(Bitboard b)
             {
-                pseudoAttacks[(int)White, (int)s1] = s1.SafeStep(NorthEast) | s1.SafeStep(NorthWest); //White pawn attacks
-                pseudoAttacks[(int)Black, (int)s1] = s1.SafeStep(SouthEast) | s1.SafeStep(SouthWest); //Black pawn attacks
+                bits = b;
+            }
 
-                foreach (Direction d in stackalloc[] { (Direction)17, (Direction)15, (Direction)10, (Direction)6, (Direction)(-6), (Direction)(-10), (Direction)(-15), (Direction)(-17) })
-                    pseudoAttacks[(int)Knight, (int)s1] |= s1.SafeStep(d); //>Knight
+            public bool MoveNext()
+            {
+                if (bits != 0)
+                {
+                    Current = PopSquare(ref bits);
+                    return true;
+                }
+                else
+                    return false;
+            }
+        }
 
-                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Bishop, (int)s1] = Attacks(Bishop, s1, 0); //Bishop
-                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Rook, (int)s1] = Attacks(Rook, s1, 0); //Rook
+        struct MagicStruct
+        {
+            public Bitboard mask;
+            public ulong magic;
+            public int shift;
+            public Bitboard[] attacks;
 
-                foreach (Direction d in stackalloc[] { North, East, West, South, NorthEast, NorthWest, SouthEast, SouthWest })
-                    pseudoAttacks[(int)King, (int)s1] |= s1.SafeStep(d); //King
+            public readonly int CalculateIndex(Bitboard occupancy)
+            {
+                return (int)((ulong)(occupancy & mask) * magic >> shift);
+            }
 
-
-                foreach (PieceType pt in stackalloc[] { Bishop, Rook })
-                    for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
-                        if ((pseudoAttacks[(int)pt, (int)s1] & s2.ToBitboard()) != 0)
-                        {
-                            line[(int)s1, (int)s2] = Attacks(pt, s1, 0) & Attacks(pt, s2, 0) | s1.ToBitboard() | s2.ToBitboard();
-                            between[(int)s1, (int)s2] = Attacks(pt, s1, s2.ToBitboard()) & Attacks(pt, s2, s1.ToBitboard());
-                        }
+            public readonly Bitboard GetAttack(Bitboard occupancy)
+            {
+                return attacks[(int)((ulong)(occupancy & mask) * magic >> shift)];
             }
         }
     }

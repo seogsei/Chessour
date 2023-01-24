@@ -1,75 +1,108 @@
 ﻿using System.Runtime.InteropServices;
+using System.Numerics;
 
 namespace Chessour
 {
-    public enum Bound
+    class TranspositionTable
     {
-        Exact,
-        UpperBound,
-        LowerBound
-    }
+        Entry[] entries;
 
-    struct TTEntry
-    {
-        Key key;
-        byte depth;
-        byte gen8;
-        ushort move;
-        short eval;
-
-        public Key Key { get => key; }
-        public int Depth { get => depth; }
-        public Move Move { get => (Move)move; }
-        public bool isPV { get => (gen8 & 4) != 0; }
-        public Bound Bound { get => (Bound)(gen8 & 3); }
-        public Value Evaluation { get => (Value)eval; }
-
-        public void Save(Key key, int depth, Move move, bool isPV, Bound boundType, Value evaluation)
+        public TranspositionTable(uint initialSizeInMB = 8)
         {
-            this.key = key;
-            this.move = (ushort)move;
-            this.eval = (short)evaluation;
-            this.depth = (byte)depth;
+            Resize(initialSizeInMB);
 
-            byte gen8 = (byte)((isPV ? 4 : 0) | (int)boundType);
-            this.gen8 = gen8;
-        }
-    }
-
-    static class TranspositionTable
-    {
-        static TTEntry[] entries;
-        static int shift;
-
-        static TranspositionTable()
-        {
-            entries = new TTEntry[1 << 16];
-            shift = 64 - 16;
+            if (entries is null)
+                throw new Exception();
         }
 
-        public static void Resize(int sizeInMB)
-        {
-            if (sizeInMB < 0)
-                return;
+        public int Generation { get; private set; }
 
-            int entryCount = sizeInMB * 1024 * 1024 / Marshal.SizeOf(typeof(TTEntry));
+        public void NewSearch()
+        {
+            Generation += 1 << 3;
         }
-        public static void Clear()
+
+        public void Clear()
         {
             Array.Clear(entries);
         }
 
-        public static ref TTEntry ProbeTT(Key key, out bool found)
+        public void Resize(uint sizeInMB)
         {
-            ref TTEntry entry = ref Find(key);
+            Engine.Threads.WaitForSeachFinish();
 
-            found = entry.Depth != 0;
-            return ref entry;
+            //If size is not a power of 2 get the nearest smaller power of 2
+            if(!BitOperations.IsPow2(sizeInMB))
+                sizeInMB = BitOperations.RoundUpToPowerOf2(sizeInMB / 2);
+
+            nuint entryCount = (nuint)(sizeInMB * 1024 * 1024 / Marshal.SizeOf(typeof(Entry)));
+
+            entries = new Entry[entryCount];
         }
 
-        private static ref TTEntry Find(Key key)
+        public ref Entry ProbeTT(Key key, out bool found)
         {
-            return ref entries[(ulong)key >> shift];
+            ref Entry entry = ref GetEntry(key);
+
+            //Entry is either refers to same position or is empty
+            if(entry.Key == key || entry.Depth == 0)
+            {
+                found = entry.depth8 != 0;
+                return ref entry;
+            }
+
+            ref Entry replace = ref entry;
+            if (replace.depth8 != 0)
+            {
+
+            }
+
+
+            found = false;
+            return ref replace;
+        }
+
+        private ref Entry GetEntry(Key key)
+        {
+            return ref entries[(ulong)key & ((ulong)entries.Length - 1)];
+        }
+
+        public struct Entry
+        {
+            internal ulong key64;
+            internal ushort move16;
+            internal byte depth8;
+            internal short eval16;
+            internal byte gen8;
+
+            public Key Key { get => (Key)key64; }
+            public Move Move { get => (Move)move16; }
+            public Depth Depth { get => depth8 - Depth.TTDepthOffset; }
+            public Value Evaluation { get => (Value)eval16; }
+            public Bound BoundType { get => (Bound)(gen8 & 3); }
+            public bool IsPV { get => (gen8 & 4) != 0; }
+            public int Generation { get => gen8 >> 3; }
+
+            public void Save(Key key, bool isPV, Move move, Depth depth, Bound boundType, Value evaluation)
+            {
+                if (move != Move.None || (ulong)key != key64)
+                {
+                    move16 = (ushort)move;
+                }
+                if (boundType == Bound.Exact
+                    || (ulong)key != key64
+                    || (depth - (int)Depth.TTDepthOffset + (isPV ? 2 : 0)) > (Depth)depth8 - 4)
+                {
+                    Debug.Assert(depth > Depth.TTDepthOffset);
+                    Debug.Assert(depth < 256 + Depth.TTDepthOffset);
+
+                    key64 = (ulong)Key;
+                    move16 = (ushort)move;
+                    depth8 = (byte)(Depth + (int)Depth.TTDepthOffset);
+                    eval16 = (short)evaluation;
+                    gen8 = (byte)(Engine.TTTable.Generation + (isPV ? 4 : 0) + boundType);
+                }
+            }
         }
     }
 }

@@ -5,21 +5,17 @@
         White, Black, NB
     }
 
-    public static partial class CoreFunctions
+    public static partial class Core
     {
         public static bool IsValid(this Color color)
         {
             return color == Color.White || color == Color.Black;
         }
 
-        public static Color Opposite(this Color color)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Color Flip(this Color color)
         {
-            return (Color)((int)color ^ (int)Color.Black);
-        }
-
-        public static Direction PawnPush(Color side)
-        {
-            return Direction.North - (16 * (int)side);
+            return color ^ Color.Black;
         }
     }
 }

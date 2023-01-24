@@ -1,286 +1,277 @@
-﻿using System.Collections.Generic;
-using System.Security.Cryptography;
-using static Chessour.SearchObject;
+﻿using static Chessour.Position;
 
 namespace Chessour
 {
-    public enum NodeType { NonPV, PV, Root }
-    class RootMoves : List<RootMove>
+    class Search
     {
-        public RootMoves() : base(MoveGenerator.MaxMoveCount) { }
+        public readonly RootMoves rootMoves;
+        public SearchStats stats;
+        public UCI.SearchLimits limits;
+        public volatile bool stop;
+        public volatile bool sendInfo;
 
-        public void Add(Move m) => Add(new RootMove(m));
-        public bool Contains(Move m)
+        readonly Position rootPosition;
+        readonly StateInfo rootState;
+        readonly StateInfo[] states;
+     
+        public Search()
         {
-            foreach (RootMove rm in this)
-                if (rm.Move == m)
-                    return true;
-            return false;
-        }
-        public RootMove Find(Move m)
-        {
-            foreach (var rm in this)
-                if (rm.Move == m)
-                    return rm;
-
-            throw new InvalidOperationException();
-        }
-
-        public new void Sort()
-        {
-            int n = Count;
-            for (int i = 1; i < n; ++i)
-            {
-                RootMove rm = this[i];
-                int j = i - 1;
-
-                // Move elements of arr[0..i-1],
-                // that are greater than key,
-                // to one position ahead of
-                // their current position
-                while (j >= 0 && this[j] < rm)
-                {
-                    this[j + 1] = this[j];
-                    j--;
-                }
-                this[j + 1] = rm;
-            }
-        }
-    }
-    class RootMove
-    {
-        public Move[] pv = new Move[MaxDepth];
-        public Value Score { get; set; }
-        public Value PreviousScore { get; set; }
-        public Value UCIScore { get; set; }
-        public bool LowerBound { get; set; }
-        public bool UpperBound { get; set; }
-
-        public Move Move { get => pv[0]; }
-        public Move Refutation { get => pv[1]; }
-        public RootMove(Move m)
-        {
-            pv[0] = m;
-        }
-
-        public static bool operator <(RootMove lhs, RootMove rhs)
-        {
-            return lhs.Score != rhs.Score ? lhs.Score < rhs.Score
-                                            : lhs.PreviousScore < rhs.PreviousScore;
-        }
-        public static bool operator >(RootMove lhs, RootMove rhs) => rhs < lhs;
-    }
-    class SearchStack
-    {
-        public Move[] pv = new Move[MaxDepth];
-        public bool inCheck;
-        public bool ttHit;
-        public bool ttPv;
-        public Value staticEval;
-    }
-
-    class SearchObject
-    {
-        public const int MaxDepth = 128;
-        public const int MaxPly = 128;
-
-        public static Value MatedIn(int ply)
-        {
-            return MateIn(ply).Negate();
-        }
-
-        public static Value MateIn(int ply)
-        {
-            return Value.Mate - ply;
-        }
-
-        public struct SearchLimits
-        {
-            public List<Move> searchMoves;
-            public int perft;
-            public int depth;
-        }
-
-        public bool Stop { get; set; }
-
-        public RootMoves rootMoves;
-
-        public readonly SearchStack[] searchStack;
-
-        readonly FastStack<Position.StateInfo> stateInfos;
-
-        public SearchLimits limits;
-
-        public ulong NodeCount { get; private set; }
-        public ulong QNodeCount { get; private set; }
-
-        public SearchObject()
-        {
-            stateInfos = new(MaxPly);
-            searchStack = new SearchStack[MaxPly];
+            rootPosition = new(UCI.StartFEN, rootState = new());
             rootMoves = new();
 
-            for (int i = 0; i < MaxPly; i++)
+            states = new StateInfo[MAX_PLY];
+            for (int i = 0; i < MAX_PLY; i++)
             {
-                stateInfos.Push(new Position.StateInfo());
-                searchStack[i] = new();
+                states[i] = new();
             }
         }
 
-        public ulong Perft(Position position, int depth, bool root = true)
+        enum NodeType
         {
-            bool leaf = depth == 2;
+            Root,
+            PV,
+            NonPV
+        }
 
-            ulong branchNodes, nodes = 0;
-            var state = stateInfos.Pop();
+        public void SetUpSearchParameters(Position position, in UCI.SearchLimits limits)
+        {
+            rootPosition.Set(position, rootState);
+            rootMoves.Clear();
 
-            foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]))
+            this.limits = limits;
+
+            MoveList moves = new(rootPosition, stackalloc MoveScore[MAX_MOVE_COUNT]);
+            foreach (Move m in moves)
+                if (limits.searchMoves is null || limits.searchMoves.Contains(m))
+                    rootMoves.Add(new RootMove(m));
+        }
+
+        public void StartSearch(Position position, in UCI.SearchLimits limits)
+        {
+            SetUpSearchParameters(position, limits);
+            StartSearch();
+        }
+
+        public void StartSearch()
+        {
+            stats = new SearchStats();
+            
+            if (limits.perft > 0)
             {
-                if (root && depth <= 1)
+                stats.nodeCount = Perft(limits.perft);
+                return;
+            }
+
+            Depth iterativeDepth = 0;
+            Value bestValue = Value.Min;
+            Value alpha = Value.Min;
+            Value delta = Value.Min;
+            Value beta = Value.Max;
+
+            Span<SearchStack> stacks = stackalloc SearchStack[MAX_PLY];
+
+
+            while(++iterativeDepth < Depth.Max
+                && !stop
+                && !(limits.depth > 0 && iterativeDepth > limits.depth))
+            {
+                foreach (var rm in rootMoves)
+                    rm.previousScore = rm.score;
+
+                stats.selectiveDepth = 0;
+
+                int failHighCount = 0;
+                while (true)
+                {
+                    bestValue = SearchMain(NodeType.Root, stacks, alpha, beta, 0, iterativeDepth);
+
+                    rootMoves.Sort();
+
+                    if (stop)
+                        break;
+
+                    if (bestValue <= alpha) //fail low
+                    {
+                        beta = (Value)((int)(alpha + (int)beta) / 2);
+                        alpha = Max(bestValue - (int)delta, Value.Min);
+
+                        failHighCount = 0;
+                    }
+                    else if (bestValue >= beta) //fail high
+                    {
+                        beta = Min(bestValue + (int)delta, Value.Max);
+                        failHighCount++;
+                    }
+                    else 
+                        break;
+
+                    delta += (int)delta / 4;
+
+                    Debug.Assert(alpha >= Value.Min && beta <= Value.Max);
+                }
+
+                rootMoves.Sort();
+
+                if (sendInfo)
+                    Console.WriteLine($"info depth {(int)iterativeDepth} seldepth {stats.selectiveDepth} score {UCI.ToString(bestValue)} nodes {stats.nodeCount} qnodes {stats.qNodeCount} pv {UCI.ParsePV(rootMoves[0].pv)}");
+
+                if (!stop)
+                    stats.completedDepth = iterativeDepth;
+
+                if(limits.mate > 0
+                    && bestValue >= Value.MateInMaxPly
+                    && Value.Mate - bestValue >= 2 * limits.mate)
+                        stop = true;
+
+                Debug.Assert(alpha >= Value.Min && beta <= Value.Max);                           
+            }
+        }
+
+        private static void UpdatePV(Span<Move> pv, Move move, Span<Move> childPv)
+        {
+            int i = 0, j = 0;
+            pv[i++] = move;
+            while (childPv[j] != Move.None) // Has the child pv ended
+                pv[i++] = childPv[j++]; // Copy the moves from the child pv
+            pv[i] = Move.None; // Put this at the end to represent pv line ended
+        }
+
+        private ulong Perft(int depth, int ply = 0)
+        {
+            ulong branchNodes, nodes = 0;
+
+            var state = states[ply];
+
+            foreach (Move m in new MoveList(rootPosition, stackalloc MoveScore[MAX_MOVE_COUNT]))
+            {
+                if (ply == 0 && depth <= 1)
                     nodes += branchNodes = 1;
 
                 else
                 {
-                    position.MakeMove(m, state);
+                    rootPosition.MakeMove(m, state);
 
-                    nodes += branchNodes = leaf ? (ulong)new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]).Count
-                                                : Perft(position, depth - 1, false);
+                    nodes += branchNodes = depth == 2 ? (ulong)new MoveList(rootPosition, stackalloc MoveScore[MAX_MOVE_COUNT]).Count
+                                                      : Perft(depth - 1, ply + 1);
 
-                    position.Takeback();
+                    rootPosition.Takeback(m);
                 }
 
-                if (root)
-                    Console.WriteLine($"{UCI.ToString(m)}: {branchNodes}");
+                if (ply == 0)
+                    Console.WriteLine($"{m.LongAlgebraicNotation()}: {branchNodes}");
             }
 
-            stateInfos.Push(state);
             return nodes;
         }
 
-        public void Reset()
-        {
-            NodeCount = 0;
-            QNodeCount = 0;
-        }
-
-        public enum NodeTypes
-        {
-            Root,
-            PvNode,
-            NonPvNode
-        }
-
-        public Value Search(NodeType nodeType, Position position, int ply, Value alpha, Value beta, int depth)
+        private Value SearchMain(NodeType nodeType, Span<SearchStack> ss, Value alpha, Value beta, int ply, Depth depth, Span<Move> pv = default)
         {
             bool root = nodeType == NodeType.Root;
             bool pvNode = nodeType != NodeType.NonPV;
 
             if (depth <= 0)
-                return QSearch(nodeType, position, ply, alpha, beta);
+                return QSearch(nodeType, ss, alpha, beta, ply, pv);
+
+
+            Span<Move> childPv = stackalloc Move[MAX_PLY];
+
+            stats.nodeCount++;
+            ss[ply].inCheck = rootPosition.IsCheck();
+            Value bestValue = Value.Min;
+            Move bestMove = Move.None;
+            int moveCount = 0;
+
+            if (pvNode && stats.selectiveDepth < (Depth)(ply + 1))
+                stats.selectiveDepth = (Depth)ply + 1;
 
             if (!root)
             {
                 //Mate distance pruning
-                alpha = (Value)Math.Max((int)MatedIn(ply), (int)alpha);
-                beta = (Value)Math.Min((int)MateIn(ply + 1), (int)beta);
+                alpha = Max(MatedIn(ply), alpha);
+                beta = Min(MateIn(ply + 1), beta);
                 if (alpha >= beta)
                     return alpha;
             }
 
-            int moveCount;
-            Value bestValue, ttValue, value;
-            Move bestMove, ttMove, move;
-            int baseDepth = depth;
 
-            Color us = position.ActiveColor;
-            NodeCount++;
-            searchStack[ply].inCheck = position.IsCheck();
-            searchStack[ply].ttPv = false;
+            //Transposition table lookup
+            Key positionKey = rootPosition.ZobristKey;
+            ref TranspositionTable.Entry ttentry = ref Engine.TTTable.ProbeTT(positionKey, out ss[ply].ttHit);
+            Value ttValue = ss[ply].ttHit ? ttentry.Evaluation : Value.Zero;
+            Move ttMove = root ? rootMoves[0].pv[0]
+                                : ss[ply].ttHit ? ttentry.Move
+                                                : Move.None;
 
-            bestValue = value = Value.Min;
-            bestMove = Move.None;
-            moveCount = 0;
 
-            Key posKey = position.ZobristKey;
-
-            ref TTEntry ttEntry = ref TranspositionTable.ProbeTT(posKey, out searchStack[ply].ttHit);
-            ttValue = searchStack[ply].ttHit ? ttEntry.Evaluation : 0;
-            ttMove = root ? rootMoves[0].Move
-                          : searchStack[ply].ttHit ? ttEntry.Move
-                                                   : Move.None;
-
-            //Moves loop
-            MovePicker mp = new(position, ttMove, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
-
-            Position.StateInfo st = stateInfos.Pop();
-            while ((move = mp.NextMove()) != Move.None)
+            MovePicker mp = new(rootPosition, ttMove, stackalloc MoveScore[MAX_MOVE_COUNT]);
+            for(Move move; ((move = mp.NextMove()) != Move.None);)
             {
-                if (!position.IsLegal(move))
+                if (root && !rootMoves.Contains(move))
                     continue;
 
+                if (!root && !rootPosition.IsLegal(move))
+                    continue;
 
-                //Count the number of legal moves
                 moveCount++;
-                bool givesCheck = position.GivesCheck(move);
+                bool givesCheck = rootPosition.GivesCheck(move);
 
-                //If we return withouth doing any moves in a non pv move that causes a beta cutoff we would get the wrong line
-                //This basicaly chops the entire pv line as it should already be recorded in this ply's searchstack
                 if (pvNode)
-                    searchStack[ply + 1].pv[0] = Move.None;
+                    childPv[0] = Move.None;
 
-                position.MakeMove(move, st, givesCheck);
+                rootPosition.MakeMove(move, states[ply], givesCheck);
 
                 //For any node outside of the pv we are doing aspiration searches to prove our pv line is just fine
                 //For more information read PVS and Aspiration section in : https://www.chessprogramming.org/Principal_Variation_Search
+                Value value = Value.Min;
                 if (!pvNode || moveCount > 1)
-                    value = Search(NodeType.NonPV, position, ply + 1, (alpha + 1).Negate(), alpha.Negate(), depth - 1).Negate();
-
-                if (pvNode //If aspiration search fails it will fail back to one of the pv nodes and from there we will start a pvNode search
-                    && (moveCount == 1 // It is the first move we search on this node so therefor part of the pv
-                       || (value > alpha // Value is higher than alpha 
-                        && (root || value < beta)))) //But lower than beta except when we are on the root node
-                                                     //They cant prevent us from doing the move if we are at the root node
                 {
-                    searchStack[ply + 1].pv[0] = Move.None;
-
-                    value = Search(NodeType.PV, position, ply + 1, beta.Negate(), alpha.Negate(), depth - 1).Negate();
+                    value = SearchMain(NodeType.NonPV, ss, (alpha + 1).Negate(), alpha.Negate(), ply + 1, depth - 1).Negate();
                 }
 
-                position.Takeback();
+                if(pvNode 
+                    && moveCount == 1
+                    || (value > alpha
+                        && (root || value < beta)))
+                {
+                    childPv[0] = Move.None;
+
+                    value = SearchMain(NodeType.PV, ss, beta.Negate(), alpha.Negate(), ply + 1, depth - 1, childPv).Negate();
+                }
+
+                rootPosition.Takeback(move);
+
+                if (stop)
+                    return 0;
 
                 Debug.Assert(value > Value.Min && value < Value.Max);
 
-                if (Stop)
-                    break;
-
                 if (root)
                 {
-                    //Update the rootMoves list
-                    RootMove rm = rootMoves.Find(move);
+                    RootMove rm = rootMoves.Find(move) ?? throw new Exception();
 
                     if (moveCount == 1 || value > alpha)
                     {
-                        rm.Score = value;
-                        rm.LowerBound = rm.UpperBound = false;
+                        rm.score = rm.uciScore = value;
+                        rm.selDepth = stats.selectiveDepth;
 
-                        if (value >= beta)
+                        rm.boundLower = rm.boundUpper = false;
+
+                        if(value >= beta)
                         {
-                            rm.LowerBound = true;
-                            rm.UCIScore = beta;
+                            rm.boundLower = true;
+                            rm.uciScore = beta;
                         }
-                        else if (value <= alpha)
+                        else if(value <= alpha)
                         {
-                            rm.UpperBound = true;
-                            rm.UCIScore = alpha;
+                            rm.boundUpper = true;
+                            rm.uciScore = alpha;
                         }
 
-                        Array.Clear(rm.pv);
-                        rm.pv[0] = move;
-
-                        UpdatePV(rm.pv, move, searchStack[ply + 1].pv);
+                        Array.Clear(rm.pv, 1, rm.pv.Length - 1);
+                        UpdatePV(rm.pv, move, childPv);
                     }
                     else
-                        rm.Score = Value.Min;
+                        rm.score = Value.Min;
                 }
 
                 if (value > bestValue)
@@ -293,20 +284,20 @@ namespace Chessour
 
                         if (pvNode && !root)
                         {
-                            UpdatePV(searchStack[ply].pv, move, searchStack[ply + 1].pv);
+                            UpdatePV(pv, move, childPv);
                         }
 
                         if (pvNode && value < beta)
                         {
                             alpha = value;
-                            /*
-                            //We are happy with one improvement so we can shorten searches of the other moves to speed up overal search                            
-                            if (depth > 1
-                            && depth < 6
+
+                            //Early on the search we want to keep looking forward in our tt move as it can be very volatile                            
+                            if (depth > (Depth)1
+                            && depth < (Depth)6
                             && beta < Value.KnownWin
                             && alpha > Value.KnownLoss)
                                 depth -= 1;
-                            */
+
                             Debug.Assert(depth > 0);
                         }
                         else
@@ -317,32 +308,23 @@ namespace Chessour
                     }
                 }
             }
-            //Return the state object
-            stateInfos.Push(st);
 
-            if (Stop)
+            if(moveCount == 0)
             {
-                return 0;
+                bestValue = ss[ply].inCheck ? MatedIn(ply)
+                                                : Value.Draw;
             }
 
-
-            if (moveCount == 0)
-            {
-                bestValue = searchStack[ply].inCheck ? MatedIn(ply)
-                                                    : Value.Draw;
-            }
-
-            ttEntry.Save(posKey, depth, move, pvNode,
-                bestValue >= beta ? Bound.LowerBound
-                                  : pvNode && bestMove != Move.None ? Bound.Exact
-                                                                    : Bound.UpperBound, bestValue);
+            ttentry.Save(positionKey, pvNode, bestMove, depth,
+                bestValue >= beta ? Bound.Lower
+                                 : pvNode && bestMove != Move.None ? Bound.Exact
+                                                                   : Bound.Upper, bestValue);
 
             return bestValue;
         }
 
-        private Value QSearch(NodeType nodeType, Position position, int ply, Value alpha, Value beta, int depth = 0)
+        private Value QSearch(NodeType nodeType, Span<SearchStack> ss, Value alpha, Value beta, int ply, Span<Move> pv, Depth depth = 0)
         {
-            bool root = nodeType == NodeType.Root;
             bool pvNode = nodeType != NodeType.NonPV;
 
             Debug.Assert(nodeType != NodeType.Root); // We shouldn be entering qSearch at root node
@@ -350,82 +332,102 @@ namespace Chessour
             Debug.Assert(pvNode || (alpha == beta - 1)); //This is a pv node or we are in a aspiration search
             Debug.Assert(depth <= 0); //Depth is not outside defined bounds
 
-            Key posKey;
-            int moveCount;
-            Value bestValue, ttValue, value;
-            Move bestMove, ttMove, move;
 
-            QNodeCount++;
-            searchStack[ply].inCheck = position.IsCheck();
-            moveCount = 0;
-            bestValue = value = Value.Min;
-            bestMove = Move.None;
+            stats.qNodeCount++;
+            stats.nodeCount++;
+            ss[ply].inCheck = rootPosition.IsCheck();
 
+            Span<Move> childPV = stackalloc Move[MAX_PLY];
+            Value bestValue = Value.Min;
+            Move bestMove = Move.None;
+            int moveCount = 0;
 
-            //If we return from this node because of some pruning without doing any moves
-            //we need to prevent the parent from getting the wrong pv line as pv arrays are shared between children
             if (pvNode)
-                searchStack[ply].pv[0] = Move.None;
+                pv[0] = Move.None;              
 
-            //As qSearch is not bound for any depth limitations check if we reached max plyCount
-            if (ply >= MaxPly)
-                return (ply >= MaxPly && !searchStack[ply].inCheck) ? Evaluation.Evaluate(position) : 0;
+            if (ply >= MAX_PLY)
+                return (ply >= MAX_PLY && !ss[ply].inCheck) ? Evaluation.Evaluate(rootPosition)
+                                                            : Value.Draw;
 
-            //Transposition table
-            posKey = position.ZobristKey;
-            ref var ttEntry = ref TranspositionTable.ProbeTT(posKey, out searchStack[ply].ttHit);
-            ttValue = searchStack[ply].ttHit ? ttEntry.Evaluation : 0;
-            ttMove = searchStack[ply].ttHit ? ttEntry.Move : Move.None;
+            //Mate distance pruning
+            alpha = Max(MatedIn(ply), alpha);
+            beta = Min(MateIn(ply + 1), beta);
+            if (alpha >= beta)
+                return alpha;
+
+            Depth ttDepth = ss[ply].inCheck || depth >= Depth.QSearch_Checks ? Depth.QSearch_Checks
+                                                                 : Depth.QSearch_NoChecks;
+
+            //Transposition table lookup
+            Key positionKey = rootPosition.ZobristKey;
+            ref TranspositionTable.Entry ttentry = ref Engine.TTTable.ProbeTT(positionKey, out ss[ply].ttHit);
+            Value ttValue = ss[ply].ttHit ? ttentry.Evaluation : Value.Zero;
+            Move ttMove = ss[ply].ttHit ? ttentry.Move
+                                        : Move.None;
+
+            if (!pvNode
+                && ss[ply].ttHit
+                && ttentry.Depth >= ttDepth
+                && (ttentry.BoundType & (ttValue >= beta ? Bound.Lower : Bound.Upper)) != 0)
+                return ttValue;
 
             //Static evaluation
-            //We will use this evaluation to perform the stand pat
-            //We just need to be sure that this position is stable enough to evaluate properly
-            if (searchStack[ply].inCheck)
+            if (ss[ply].inCheck)
             {
-                searchStack[ply].staticEval = 0;
+                ss[ply].staticEval = 0;
                 bestValue = Value.Min;
             }
             else
             {
-                searchStack[ply].staticEval = bestValue = Evaluation.Evaluate(position);
+                if (ss[ply].ttHit)
+                {
+                    if ((ss[ply].staticEval = bestValue = ttentry.Evaluation) == 0)
+                        ss[ply].staticEval = bestValue = Evaluation.Evaluate(rootPosition);
+
+                    if (ttValue != 0
+                        && (ttentry.BoundType & (ttValue > bestValue ? Bound.Lower : Bound.Upper)) != 0)
+                        bestValue = ttValue;
+                }
+                else
+                    ss[ply].staticEval = bestValue = Evaluation.Evaluate(rootPosition);
+
+                //Stand pat
+                if (bestValue >= beta)
+                {
+                    if (!ss[ply].ttHit)
+                        ttentry.Save(positionKey, pvNode, Move.None, Depth.None, Bound.Lower, ss[ply].staticEval);
+
+                    return bestValue;
+                }
+
+                if (pvNode && bestValue > alpha)
+                    alpha = bestValue;
             }
-
-            //Stand pat
-            if (bestValue >= beta)
+            
+            MovePicker mp = new(rootPosition, ttMove, Square.a1, stackalloc MoveScore[MAX_MOVE_COUNT]);
+            for (Move move; ((move = mp.NextMove()) != Move.None);)
             {
-                return bestValue;
-            }
-
-            if (pvNode && bestValue > alpha)
-                alpha = bestValue;
-
-
-            //Moves loop
-            MovePicker mp = new(position, Move.None, Square.a1, stackalloc MoveScore[MoveGenerator.MaxMoveCount]);
-
-            Position.StateInfo st = stateInfos.Pop();
-            while ((move = mp.NextMove()) != Move.None)
-            {
-                if (!position.IsLegal(move))
+                if (!rootPosition.IsLegal(move))
                     continue;
 
                 moveCount++;
-                bool givesCheck = position.GivesCheck(move);
+                bool givesCheck = rootPosition.GivesCheck(move);
 
-                //If we are not in a desperate situation we can skip the moves that returns a negative SEE
+                //If we are not in a desperate situation we can skip the moves that returns a negative Static Exchange Evaluation
                 if (bestValue > Value.KnownLoss
-                    && !position.SeeGe(move))
+                    && !rootPosition.SeeGe(move))
                     continue;
 
-                position.MakeMove(move, st, givesCheck);
-                value = QSearch(nodeType, position, ply + 1, beta.Negate(), alpha.Negate(), depth - 1).Negate();
-                position.Takeback();
+                rootPosition.MakeMove(move, states[ply], givesCheck);
 
-                if (Stop)
-                    break;
+                Value value = QSearch(nodeType, ss, beta.Negate(), alpha.Negate(), ply + 1, childPV, depth - 1).Negate();
+
+                rootPosition.Takeback(move);
+
+                if (stop)
+                    return 0;
 
                 Debug.Assert(value > Value.Min && value < Value.Max);
-
 
                 if (value > bestValue)
                 {
@@ -436,7 +438,7 @@ namespace Chessour
                         bestMove = move;
 
                         if (pvNode)
-                            UpdatePV(searchStack[ply].pv, move, searchStack[ply + 1].pv);
+                            UpdatePV(pv, move, childPV);
 
                         if (pvNode && value < beta)
                             alpha = value;
@@ -446,33 +448,157 @@ namespace Chessour
                     }
                 }
             }
-            stateInfos.Push(st);
 
-            if (Stop)
-                return 0;
-
-            //After searching every move if we have found no legal moves and we are in check we are mated
-            if (searchStack[ply].inCheck && bestValue == Value.Min)
+            //After searching every evasion move if we have found no legal moves and we are in check we are mated
+            if (ss[ply].inCheck && bestValue == Value.Min)
             {
-                Debug.Assert(new MoveList(position, stackalloc MoveScore[MoveGenerator.MaxMoveCount]).Count == 0);
+                Debug.Assert(new MoveList(rootPosition, stackalloc MoveScore[MAX_MOVE_COUNT]).Count == 0);
                 return MatedIn(ply);
             }
 
-            ttEntry.Save(posKey, depth, bestMove, pvNode,
-                bestValue >= beta ? Bound.LowerBound
-                                  : Bound.UpperBound,
-                searchStack[ply].staticEval);
+            ttentry.Save(positionKey, pvNode, bestMove, ttDepth,
+                bestValue >= beta ? Bound.Lower
+                                 : pvNode && bestMove != Move.None ? Bound.Exact
+                                                                    : Bound.Upper, bestValue);
 
-            Debug.Assert(bestValue > Value.Min && bestValue < Value.Max);
             return bestValue;
         }
-        private static void UpdatePV(Move[] pv, Move move, Move[] childPv)
+
+        public class RootMoves
         {
-            int i = 0, j = 0;
-            pv[i++] = move;
-            while (childPv[j] != Move.None) // Has the child pv ended
-                pv[i++] = childPv[j++]; // Copy the moves from the child pv
-            pv[i] = Move.None; // Put this at the end to represent pv line ended
+            readonly RootMove[] buffer = new RootMove[MAX_MOVE_COUNT];
+            public int Count { get; private set; }
+
+            public bool Contains(Move m)
+            {
+                for (int i = 0; i < Count; i++)
+                    if (buffer[i].Move == m)
+                        return true;
+                return false;
+            }
+
+            public RootMove? Find(Move m)
+            {
+                for (int i = 0; i < Count; i++)
+                    if (buffer[i].Move == m)
+                        return buffer[i];
+                return null;
+            }
+
+            public void Sort(int start = 0)
+            {
+                Utility.PartialInsertionSort(buffer, start, Count);
+            }
+
+            public void Add(RootMove rootMove)
+            {
+                buffer[Count++] = rootMove;
+            }
+
+            public void Clear()
+            {
+                Count = 0;
+            }
+
+            public Enumerator GetEnumerator()
+            {
+                return new(this);
+            }
+            public struct Enumerator
+            {
+                readonly RootMoves rm;
+                private int idx;
+
+                public RootMove Current { get; private set; }
+
+                public Enumerator(RootMoves rms)
+                {
+                    rm = rms;
+                    idx = -1;
+
+                    Current = rm.buffer[0];
+                }
+
+                public bool MoveNext()
+                {
+                    if (++idx < rm.Count)
+                    {
+                        Current = rm.buffer[++idx];
+                        return true;
+                    }
+                    return false;
+                }
+            }
+
+            public RootMove this[int i]
+            {
+                get => buffer[i];
+            }
+        }
+
+        public class RootMove : IArithmeticComparable<RootMove>
+        {
+            public readonly Move[] pv = new Move[MAX_PLY];
+            public Value score;
+            public Value previousScore;
+            public Value uciScore;
+            public bool boundUpper;
+            public bool boundLower;
+            public Depth selDepth;
+
+            public RootMove()
+            {
+
+            }
+            public RootMove(Move m)
+            {
+                pv[0] = m;
+            }
+
+            public Move Move
+            {
+                get => pv[0];
+                set
+                {
+                    Array.Clear(pv);
+                    pv[0] = value;
+                }
+            }
+
+            public int CompareTo(RootMove? other)
+            {
+                if (other is null)
+                    return 1;
+
+                return score != other.score ? score.CompareTo(other.score)
+                                            : previousScore.CompareTo(other.previousScore);
+            }
+
+            public static bool operator <(RootMove lhs, RootMove rhs)
+            {
+                return lhs.score != rhs.score ? lhs.score < rhs.score
+                                                : lhs.previousScore < rhs.previousScore;
+            }
+            public static bool operator >(RootMove lhs, RootMove rhs)
+            {
+                return lhs.score != rhs.score ? lhs.score > rhs.score
+                                                : lhs.previousScore > rhs.previousScore;
+            }
+        }
+
+        public struct SearchStats
+        {
+            public Depth completedDepth;
+            public Depth selectiveDepth;
+            public ulong nodeCount;
+            public ulong qNodeCount;
+        }
+
+        public struct SearchStack
+        {
+            public bool inCheck;
+            public bool ttHit;
+            public Value staticEval;
         }
     }
 }

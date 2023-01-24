@@ -4,17 +4,9 @@ namespace Chessour
 {
     ref struct MovePicker
     {
-        enum Stage
-        {
-            MainTT, CaptureGenerate, Capture, QuietGenerate, Quiet,
-            EvasionTT, EvasionGenerate, Evasions,
-            QSearchTT, QCaptureGenerate, QCapture
-        }
-
         readonly Position position;
         readonly Move ttMove;
         readonly Span<MoveScore> moves;
-
         Stage stage;
         int curent;
         int end;
@@ -30,6 +22,7 @@ namespace Chessour
             if (ttMove == Move.None || !position.IsPseudoLegal(ttMove))
                 stage++;
         }
+        
         public MovePicker(Position position, Move ttMove, Square s, Span<MoveScore> buffer)
         {
             moves = buffer;
@@ -41,9 +34,11 @@ namespace Chessour
                 stage++;
         }
 
-        public void Generate(GenerationType type)
+        enum Stage
         {
-            end = MoveGenerator.Generate(type, position, moves, curent);
+            MainTT, CaptureGenerate, Capture, QuietGenerate, Quiet,
+            EvasionTT, EvasionGenerate, Evasions,
+            QSearchTT, QCaptureGenerate, QCapture
         }
 
         public Move NextMove()
@@ -61,8 +56,7 @@ namespace Chessour
                 //Normal Positions
                 case Stage.CaptureGenerate:
                     curent = 0;
-                    end = MoveGenerator.Generate(GenerationType.Captures, position, moves, curent);
-
+                    Generate(GenerationType.Captures);
                     Score(GenerationType.Captures);
                     PartialInsertionSort(curent, end);
                     stage++;
@@ -75,7 +69,7 @@ namespace Chessour
                     goto top;
                 case Stage.QuietGenerate:
                     curent = 0;
-                    end = MoveGenerator.Generate(GenerationType.Quiets, position, moves, curent);
+                    Generate(GenerationType.Quiets);
                     stage++;
                     goto top;
 
@@ -104,6 +98,12 @@ namespace Chessour
             Debug.Assert(false);
             return Move.None;
         }
+
+        public void Generate(GenerationType type)
+        {
+            end += MoveGenerator.Generate(type, position, moves[end..]);
+        }
+     
         public void Score(GenerationType type)
         {
             int i = curent;
@@ -117,6 +117,7 @@ namespace Chessour
                         m.Score += (int)PieceValue(GamePhase.MidGame, (Piece)m.Move.PromotionPiece());
                 }
         }
+     
         private Move FindNext()
         {
             while (curent < end)
@@ -127,6 +128,7 @@ namespace Chessour
             }
             return Move.None;
         }
+       
         private void PartialInsertionSort(int start, int end)
         {
             for (int i = start; i < end; ++i)

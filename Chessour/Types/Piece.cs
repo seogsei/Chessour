@@ -2,10 +2,10 @@
 {
     public enum PieceType
     {
-        AllPieces = 0,
         None = 0,
+        AllPieces = 0,
         Pawn, Knight, Bishop, Rook, Queen, King,
-        NB
+        NB = 7,
     }
 
     public enum Piece
@@ -13,35 +13,34 @@
         None,
         WhitePawn = PieceType.Pawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing,
         BlackPawn = PieceType.Pawn + 8, BlackKnight, BlackBishop, BlackRook, BlackQueen, BlackKing,
-        NB
+        NB = 16
     }
 
 
-    public static partial class CoreFunctions
+    public static partial class Core
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Piece MakePiece(Color color, PieceType pieceType)
         {
-            return (Piece)(((int)color << 3) | (int)pieceType);
+            return (Piece)(((int)color << 3) + (int)pieceType);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static PieceType GetPieceType(this Piece piece)
         {
             return (PieceType)((int)piece & 7);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Color GetColor(this Piece piece)
         {
             return (Color)((int)piece >> 3);
         }
 
-        public static bool IsValid(this PieceType pieceType)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Piece Flip(this Piece piece)
         {
-            return pieceType >= 0 && pieceType < PieceType.NB;
-        }
-
-        public static Piece Opposite(this Piece piece)
-        {
-            return (Piece)((int)piece ^ 8);
+            return piece ^ (Piece)8;
         }
 
     }
