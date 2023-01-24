@@ -1,120 +1,19 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using System.Linq;
-using static Chessour.Position;
+﻿using static Chessour.Position;
 
 namespace Chessour
 {
-    enum NodeType
+    class Search
     {
-        Root,
-        PV,
-        NonPV
-    }
-
-    internal class Search
-    {
-        public class RootMoves : List<RootMove>
-        {
-            public RootMoves() : base(MAX_MOVE_COUNT)
-            {
-                
-            }
-
-            public bool Contains(Move m)
-            {
-                foreach (var rm in this)
-                    if (rm.Move == m)
-                        return true;
-                return false;
-            }
-            public RootMove? Find(Move m)
-            {
-                foreach (var rm in this)
-                    if (rm.Move == m)
-                        return rm;
-                return null;
-            }
-        }
-
-        public class RootMove : IArithmeticComparable<RootMove>
-        {
-            public readonly Move[] pv = new Move[MAX_PLY];
-            public Value score;
-            public Value previousScore;
-            public Value uciScore;
-            public bool boundUpper;
-            public bool boundLower;
-            public Depth selDepth;
-
-
-            public RootMove()
-            {
-
-            }
-            public RootMove(Move m)
-            {
-                pv[0] = m;
-            }
-
-            public Move Move 
-            {
-                get => pv[0];
-                set 
-                {
-                    Array.Clear(pv);
-                    pv[0] = value;
-                }
-            }
-
-            public int CompareTo(RootMove? other)
-            {
-                if (other is null)
-                    return 1;
-
-                return score != other.score ? score.CompareTo(other.score)
-                                            : previousScore.CompareTo(other.previousScore);
-            }
-
-            public static bool operator < (RootMove lhs, RootMove rhs)
-            {
-                return lhs.score != rhs.score ? lhs.score < rhs.score
-                                                : lhs.previousScore < rhs.previousScore;   
-            }
-            public static bool operator >(RootMove lhs, RootMove rhs)
-            {
-                return lhs.score != rhs.score ? lhs.score > rhs.score
-                                                : lhs.previousScore > rhs.previousScore;
-            }
-        }
-       
-        public struct SearchStats
-        {
-            public Depth completedDepth;
-            public Depth selectiveDepth;
-            public ulong nodeCount;
-            public ulong qNodeCount;
-        }
-
-        public struct SearchStack
-        {
-            public bool inCheck;
-            public bool ttHit;
-            public Value staticEval;
-        }
-
+        public readonly RootMoves rootMoves;
         public SearchStats stats;
         public UCI.SearchLimits limits;
+        public volatile bool stop;
+        public volatile bool sendInfo;
 
-        public readonly RootMoves rootMoves;
         readonly Position rootPosition;
         readonly StateInfo rootState;
-
         readonly StateInfo[] states;
-
-        public bool SendInfo { get; set; }
-        public bool Stop { get; set; }
-
+     
         public Search()
         {
             rootPosition = new(UCI.StartFEN, rootState = new());
@@ -127,9 +26,17 @@ namespace Chessour
             }
         }
 
+        enum NodeType
+        {
+            Root,
+            PV,
+            NonPV
+        }
+
         public void SetUpSearchParameters(Position position, in UCI.SearchLimits limits)
         {
             rootPosition.Set(position, rootState);
+            rootMoves.Clear();
 
             this.limits = limits;
 
@@ -139,7 +46,7 @@ namespace Chessour
                     rootMoves.Add(new RootMove(m));
         }
 
-        public void StartSearch(Position position, UCI.SearchLimits limits)
+        public void StartSearch(Position position, in UCI.SearchLimits limits)
         {
             SetUpSearchParameters(position, limits);
             StartSearch();
@@ -165,7 +72,7 @@ namespace Chessour
 
 
             while(++iterativeDepth < Depth.Max
-                && !Stop
+                && !stop
                 && !(limits.depth > 0 && iterativeDepth > limits.depth))
             {
                 foreach (var rm in rootMoves)
@@ -178,9 +85,9 @@ namespace Chessour
                 {
                     bestValue = SearchMain(NodeType.Root, stacks, alpha, beta, 0, iterativeDepth);
 
-                    InsertionSort(rootMoves);
+                    rootMoves.Sort();
 
-                    if (Stop)
+                    if (stop)
                         break;
 
                     if (bestValue <= alpha) //fail low
@@ -203,22 +110,30 @@ namespace Chessour
                     Debug.Assert(alpha >= Value.Min && beta <= Value.Max);
                 }
 
-                InsertionSort(rootMoves);
+                rootMoves.Sort();
 
+                if (sendInfo)
+                    Console.WriteLine($"info depth {(int)iterativeDepth} seldepth {stats.selectiveDepth} score {UCI.ToString(bestValue)} nodes {stats.nodeCount} qnodes {stats.qNodeCount} pv {UCI.ParsePV(rootMoves[0].pv)}");
 
-                if (SendInfo)
-                    Console.WriteLine($"info depth {(int)iterativeDepth} seldepth {stats.selectiveDepth} score {UCI.ToString(bestValue)} nodes {stats.nodeCount} qnodes {stats.qNodeCount} pv {UCI.ParsePV(rootMoves.First().pv)}");
-
-                if (!Stop)
+                if (!stop)
                     stats.completedDepth = iterativeDepth;
 
                 if(limits.mate > 0
                     && bestValue >= Value.MateInMaxPly
                     && Value.Mate - bestValue >= 2 * limits.mate)
-                        Stop = true;
+                        stop = true;
 
                 Debug.Assert(alpha >= Value.Min && beta <= Value.Max);                           
             }
+        }
+
+        private static void UpdatePV(Span<Move> pv, Move move, Span<Move> childPv)
+        {
+            int i = 0, j = 0;
+            pv[i++] = move;
+            while (childPv[j] != Move.None) // Has the child pv ended
+                pv[i++] = childPv[j++]; // Copy the moves from the child pv
+            pv[i] = Move.None; // Put this at the end to represent pv line ended
         }
 
         private ulong Perft(int depth, int ply = 0)
@@ -325,7 +240,7 @@ namespace Chessour
 
                 rootPosition.Takeback(move);
 
-                if (Stop)
+                if (stop)
                     return 0;
 
                 Debug.Assert(value > Value.Min && value < Value.Max);
@@ -509,7 +424,7 @@ namespace Chessour
 
                 rootPosition.Takeback(move);
 
-                if (Stop)
+                if (stop)
                     return 0;
 
                 Debug.Assert(value > Value.Min && value < Value.Max);
@@ -549,13 +464,141 @@ namespace Chessour
             return bestValue;
         }
 
-        private static void UpdatePV(Span<Move> pv, Move move, Span<Move> childPv)
+        public class RootMoves
         {
-            int i = 0, j = 0;
-            pv[i++] = move;
-            while (childPv[j] != Move.None) // Has the child pv ended
-                pv[i++] = childPv[j++]; // Copy the moves from the child pv
-            pv[i] = Move.None; // Put this at the end to represent pv line ended
+            readonly RootMove[] buffer = new RootMove[MAX_MOVE_COUNT];
+            public int Count { get; private set; }
+
+            public bool Contains(Move m)
+            {
+                for (int i = 0; i < Count; i++)
+                    if (buffer[i].Move == m)
+                        return true;
+                return false;
+            }
+
+            public RootMove? Find(Move m)
+            {
+                for (int i = 0; i < Count; i++)
+                    if (buffer[i].Move == m)
+                        return buffer[i];
+                return null;
+            }
+
+            public void Sort(int start = 0)
+            {
+                Utility.PartialInsertionSort(buffer, start, Count);
+            }
+
+            public void Add(RootMove rootMove)
+            {
+                buffer[Count++] = rootMove;
+            }
+
+            public void Clear()
+            {
+                Count = 0;
+            }
+
+            public Enumerator GetEnumerator()
+            {
+                return new(this);
+            }
+            public struct Enumerator
+            {
+                readonly RootMoves rm;
+                private int idx;
+
+                public RootMove Current { get; private set; }
+
+                public Enumerator(RootMoves rms)
+                {
+                    rm = rms;
+                    idx = -1;
+
+                    Current = rm.buffer[0];
+                }
+
+                public bool MoveNext()
+                {
+                    if (++idx < rm.Count)
+                    {
+                        Current = rm.buffer[++idx];
+                        return true;
+                    }
+                    return false;
+                }
+            }
+
+            public RootMove this[int i]
+            {
+                get => buffer[i];
+            }
+        }
+
+        public class RootMove : IArithmeticComparable<RootMove>
+        {
+            public readonly Move[] pv = new Move[MAX_PLY];
+            public Value score;
+            public Value previousScore;
+            public Value uciScore;
+            public bool boundUpper;
+            public bool boundLower;
+            public Depth selDepth;
+
+            public RootMove()
+            {
+
+            }
+            public RootMove(Move m)
+            {
+                pv[0] = m;
+            }
+
+            public Move Move
+            {
+                get => pv[0];
+                set
+                {
+                    Array.Clear(pv);
+                    pv[0] = value;
+                }
+            }
+
+            public int CompareTo(RootMove? other)
+            {
+                if (other is null)
+                    return 1;
+
+                return score != other.score ? score.CompareTo(other.score)
+                                            : previousScore.CompareTo(other.previousScore);
+            }
+
+            public static bool operator <(RootMove lhs, RootMove rhs)
+            {
+                return lhs.score != rhs.score ? lhs.score < rhs.score
+                                                : lhs.previousScore < rhs.previousScore;
+            }
+            public static bool operator >(RootMove lhs, RootMove rhs)
+            {
+                return lhs.score != rhs.score ? lhs.score > rhs.score
+                                                : lhs.previousScore > rhs.previousScore;
+            }
+        }
+
+        public struct SearchStats
+        {
+            public Depth completedDepth;
+            public Depth selectiveDepth;
+            public ulong nodeCount;
+            public ulong qNodeCount;
+        }
+
+        public struct SearchStack
+        {
+            public bool inCheck;
+            public bool ttHit;
+            public Value staticEval;
         }
     }
 }

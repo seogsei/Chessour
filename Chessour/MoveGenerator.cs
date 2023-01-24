@@ -3,13 +3,14 @@ using static Chessour.GenerationType;
 
 namespace Chessour
 {
-    public enum GenerationType
+    enum GenerationType
     {
         Captures,
         Quiets,
         NonEvasions,
         Evasions,
     }
+
     ref struct MoveList
     {
         readonly Span<MoveScore> moves;
@@ -75,7 +76,7 @@ namespace Chessour
         }
     }
 
-    public static class MoveGenerator
+    static class MoveGenerator
     {
         public const int MaxMoveCount = 218;
 
@@ -329,8 +330,6 @@ namespace Chessour
 
         private static int GeneratePieceMoves(PieceType pieceType, Color us, Position position, Bitboard targetSquares, Bitboard occupiedSquares, Span<MoveScore> buffer, int start)
         {
-            Bitboard pieces = position.Pieces(us, pieceType);
-
             foreach (Square pieceSquare in position.Pieces(us, pieceType))
                 foreach (Square attackSquare in Attacks(pieceType, pieceSquare, occupiedSquares) & targetSquares)
                     buffer[start++] = MakeMove(pieceSquare, attackSquare);

@@ -1,5 +1,6 @@
 ﻿namespace Chessour.Types
 {
+    [Flags]
     public enum CastlingRight
     {
         None = 0,
@@ -18,7 +19,7 @@
         NB
     }
 
-    public static partial class Core
+    static partial class Core
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static CastlingRight MakeCastlingRight(Color side, CastlingRight cr)

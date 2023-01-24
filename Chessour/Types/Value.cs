@@ -15,11 +15,11 @@ namespace Chessour.Types
         Mated = -Mate,
         Min = -Max,
 
-        PawnMG = 100, PawnEG = 110,
-        KnightMG = 300, KnightEG = 300,
-        BishopMG = 300, BishopEG = 300,
-        RookMG = 440, RookEG = 480,
-        QueenMG = 890, QueenEG = 950,
+        PawnMG = 100, PawnEG = 100,
+        KnightMG = 305, KnightEG = 305,
+        BishopMG = 333, BishopEG = 333,
+        RookMG = 563, RookEG = 563,
+        QueenMG = 950, QueenEG = 950,
     }
 
     public static partial class Core
@@ -46,6 +46,7 @@ namespace Chessour.Types
         {
             return lhs > rhs ? lhs : rhs;
         }
+
         public static Value Min(Value lhs, Value rhs)
         {
             return lhs < rhs ? lhs : rhs;

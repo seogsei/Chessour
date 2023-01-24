@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Chessour.Types
+﻿namespace Chessour.Utilities
 {
     public interface IArithmeticComparable<T> where T : IArithmeticComparable<T>
     {

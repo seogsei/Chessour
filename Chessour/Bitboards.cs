@@ -1,4 +1,5 @@
 ﻿using System.Numerics;
+using Chessour.Types;
 
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
@@ -32,45 +33,6 @@ namespace Chessour
 
     static class Bitboards
     {
-        public struct BitboardEnumerator
-        {
-            private Bitboard bits;
-            public Square Current { get; private set; }
-
-            public BitboardEnumerator(Bitboard b)
-            {
-                bits = b;
-            }
-
-            public bool MoveNext()
-            {
-                if (bits != 0)
-                {
-                    Current = PopSquare(ref bits);
-                    return true;
-                }
-                else
-                    return false;
-            }
-        }
-        struct MagicStruct
-        {
-            public Bitboard mask;
-            public ulong magic;
-            public int shift;
-            public Bitboard[] attacks;
-
-            public readonly int CalculateIndex(Bitboard occupancy)
-            {
-                return (int)((ulong)(occupancy & mask) * magic >> shift);
-            }
-
-            public readonly Bitboard GetAttack(Bitboard occupancy)
-            {
-                return attacks[(int)((ulong)(occupancy & mask) * magic >> shift)];
-            }
-        }
-
         static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
         static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
 
@@ -78,169 +40,6 @@ namespace Chessour
         static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
         static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
         static readonly Bitboard[,] pseudoAttacks = new Bitboard[(int)PieceType.NB, (int)Square.NB];
-
-        public static int Distance(Square s1, Square s2)
-        {
-            return distance[(int)s1, (int)s2];
-        }
-
-        public static Bitboard Between(Square s1, Square s2)
-        {
-            return between[(int)s1, (int)s2];
-        }
-
-        public static Bitboard Line(Square s1, Square s2)
-        {
-            return line[(int)s1, (int)s2];
-        }
-
-        public static bool Alligned(Square s1, Square s2, Square s3)
-        {
-            return (Line(s1, s2) & s3.ToBitboard()) != 0;
-        }
-
-        public static BitboardEnumerator GetEnumerator(this Bitboard b)
-        {
-            return new(b);
-        }
-
-        public static Bitboard SafeStep(this Square square, Direction direction)
-        {
-            Square to = square.Shift(direction);
-
-            return IsValid(to) && Distance(square, to) <= 2 ? to.ToBitboard() : 0;
-        }
-
-        public static Bitboard Shift(this Bitboard bitboard, Direction direction)
-        {
-            return direction switch
-            {
-                North => bitboard.ShiftNorth(),
-                South => bitboard.ShiftSouth(),
-                East => bitboard.ShiftEast(),
-                West => bitboard.ShiftWest(),
-                NorthEast => bitboard.ShiftNorthEast(),
-                NorthWest => bitboard.ShiftNorthWest(),
-                SouthEast => bitboard.ShiftSouthEast(),
-                SouthWest => bitboard.ShiftSouthWest(),
-
-                _ => throw new InvalidOperationException()
-            };
-        }
-
-        public static Bitboard ShiftNorth(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard << 8);
-        }
-
-        public static Bitboard ShiftSouth(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard >> 8);
-        }
-
-        public static Bitboard ShiftEast(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
-        }
-
-        public static Bitboard ShiftWest(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
-        }
-
-        public static Bitboard ShiftNorthEast(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
-        }
-
-        public static Bitboard ShiftNorthWest(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
-        }
-
-        public static Bitboard ShiftSouthEast(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
-        }
-
-        public static Bitboard ShiftSouthWest(this Bitboard bitboard)
-        {
-            return (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
-        }
-
-
-        public static Square PopSquare(ref Bitboard bitboard)
-        {
-            Square square = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit
-
-            bitboard &= bitboard - 1; //Resets the least significant bit
-
-            return square;
-        }
-
-        public static Square LeastSignificantSquare(this Bitboard bitboard)
-        {
-            return (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
-        }
-
-        public static Bitboard LeastSignificantBit(this Bitboard bitboard)
-        {
-            return bitboard ^ (bitboard - 1);
-        }
-
-        public static int PopulationCount(this Bitboard bitboard)
-        {
-            return BitOperations.PopCount((ulong)bitboard);
-        }
-
-        public static bool MoreThanOne(this Bitboard bitboard)
-        {
-            return (bitboard & (bitboard - 1)) != 0;
-        }
-
-        public static Bitboard PawnAttacks(Color side, Square square)
-        {
-            Debug.Assert(side.IsValid() && IsValid(square));
-
-            return pseudoAttacks[(int)side, (int)square];
-        }
-
-        public static Bitboard Attacks(PieceType pieceType, Square square)
-        {
-            Debug.Assert(pieceType != None && pieceType != Pawn, "Invalid piece type");
-
-            return pseudoAttacks[(int)pieceType, (int)square];
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Bitboard Attacks(PieceType pt, Square s, Bitboard occupancy)
-        {
-            return pt switch
-            {
-                Bishop => bishopMagics[(int)s].GetAttack(occupancy),
-                Rook => rookMagics[(int)s].GetAttack(occupancy),
-                Queen => bishopMagics[(int)s].GetAttack(occupancy) | rookMagics[(int)s].GetAttack(occupancy),
-                _ => Attacks(pt, s),
-            };
-        }
-
-        public static Bitboard ToBitboard(this Square square)
-        {
-            return (Bitboard)(1ul << (int)square);
-        }
-        
-        public static Bitboard ToBitboard(this File file)
-        {
-            return (Bitboard)((ulong)Bitboard.FileA << (int)file);
-        }
-
-        public static Bitboard ToBitboard(this Rank rank)
-        {
-            return (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
-        }
-
-
-        public static void Init() { }
 
         static Bitboards()
         {
@@ -349,6 +148,205 @@ namespace Chessour
                             line[(int)s1, (int)s2] = Attacks(pt, s1, 0) & Attacks(pt, s2, 0) | s1.ToBitboard() | s2.ToBitboard();
                             between[(int)s1, (int)s2] = Attacks(pt, s1, s2.ToBitboard()) & Attacks(pt, s2, s1.ToBitboard());
                         }
+            }
+        }
+
+        public static int Distance(Square s1, Square s2)
+        {
+            return distance[(int)s1, (int)s2];
+        }
+
+        public static Bitboard Between(Square s1, Square s2)
+        {
+            return between[(int)s1, (int)s2];
+        }
+
+        public static Bitboard Line(Square s1, Square s2)
+        {
+            return line[(int)s1, (int)s2];
+        }
+
+        public static bool Alligned(Square s1, Square s2, Square s3)
+        {
+            return (Line(s1, s2) & s3.ToBitboard()) != 0;
+        }
+
+        public static BitboardEnumerator GetEnumerator(this Bitboard b)
+        {
+            return new(b);
+        }
+
+        public static Bitboard SafeStep(this Square square, Direction direction)
+        {
+            Square to = square.Shift(direction);
+
+            return IsValid(to) && Distance(square, to) <= 2 ? to.ToBitboard() : 0;
+        }
+
+        public static Bitboard Shift(this Bitboard bitboard, Direction direction)
+        {
+            return direction switch
+            {
+                North => bitboard.ShiftNorth(),
+                South => bitboard.ShiftSouth(),
+                East => bitboard.ShiftEast(),
+                West => bitboard.ShiftWest(),
+                NorthEast => bitboard.ShiftNorthEast(),
+                NorthWest => bitboard.ShiftNorthWest(),
+                SouthEast => bitboard.ShiftSouthEast(),
+                SouthWest => bitboard.ShiftSouthWest(),
+
+                _ => throw new InvalidOperationException()
+            };
+        }
+
+        public static Bitboard ShiftNorth(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 8);
+        }
+
+        public static Bitboard ShiftSouth(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 8);
+        }
+
+        public static Bitboard ShiftEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
+        }
+
+        public static Bitboard ShiftNorthEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftNorthWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
+        }
+
+        public static Bitboard ShiftSouthEast(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
+        }
+
+        public static Bitboard ShiftSouthWest(this Bitboard bitboard)
+        {
+            return (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
+        }
+
+        public static Square PopSquare(ref Bitboard bitboard)
+        {
+            Square square = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit
+
+            bitboard &= bitboard - 1; //Resets the least significant bit
+
+            return square;
+        }
+
+        public static Square LeastSignificantSquare(this Bitboard bitboard)
+        {
+            return (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
+        }
+
+        public static Bitboard LeastSignificantBit(this Bitboard bitboard)
+        {
+            return bitboard ^ (bitboard - 1);
+        }
+
+        public static int PopulationCount(this Bitboard bitboard)
+        {
+            return BitOperations.PopCount((ulong)bitboard);
+        }
+
+        public static bool MoreThanOne(this Bitboard bitboard)
+        {
+            return (bitboard & (bitboard - 1)) != 0;
+        }
+
+        public static Bitboard PawnAttacks(Color side, Square square)
+        {
+            Debug.Assert(side.IsValid() && IsValid(square));
+
+            return pseudoAttacks[(int)side, (int)square];
+        }
+
+        public static Bitboard Attacks(PieceType pieceType, Square square)
+        {
+            Debug.Assert(pieceType != None && pieceType != Pawn, "Invalid piece type");
+
+            return pseudoAttacks[(int)pieceType, (int)square];
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Bitboard Attacks(PieceType pt, Square s, Bitboard occupancy)
+        {
+            return pt switch
+            {
+                Bishop => bishopMagics[(int)s].GetAttack(occupancy),
+                Rook => rookMagics[(int)s].GetAttack(occupancy),
+                Queen => bishopMagics[(int)s].GetAttack(occupancy) | rookMagics[(int)s].GetAttack(occupancy),
+                _ => Attacks(pt, s),
+            };
+        }
+
+        public static Bitboard ToBitboard(this Square square)
+        {
+            return (Bitboard)(1ul << (int)square);
+        }
+        
+        public static Bitboard ToBitboard(this File file)
+        {
+            return (Bitboard)((ulong)Bitboard.FileA << (int)file);
+        }
+
+        public static Bitboard ToBitboard(this Rank rank)
+        {
+            return (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
+        }
+
+        public struct BitboardEnumerator
+        {
+            private Bitboard bits;
+            public Square Current { get; private set; }
+
+            public BitboardEnumerator(Bitboard b)
+            {
+                bits = b;
+            }
+
+            public bool MoveNext()
+            {
+                if (bits != 0)
+                {
+                    Current = PopSquare(ref bits);
+                    return true;
+                }
+                else
+                    return false;
+            }
+        }
+
+        struct MagicStruct
+        {
+            public Bitboard mask;
+            public ulong magic;
+            public int shift;
+            public Bitboard[] attacks;
+
+            public readonly int CalculateIndex(Bitboard occupancy)
+            {
+                return (int)((ulong)(occupancy & mask) * magic >> shift);
+            }
+
+            public readonly Bitboard GetAttack(Bitboard occupancy)
+            {
+                return attacks[(int)((ulong)(occupancy & mask) * magic >> shift)];
             }
         }
     }

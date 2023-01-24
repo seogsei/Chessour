@@ -5,30 +5,39 @@ namespace Chessour
 {
     sealed class SearchPool : List<SearchThread>
     {
-        private MasterSearchThread Master { get => (MasterSearchThread)this[0]; } 
-
-        public void Stop()
-        {
-            Master.SearchObject.Stop = true;
-        }
-
-        public void WaitForSeachFinish() 
-        {
-            Master.WaitForSearchFinish();
-        } 
-       
-        public ulong NodesSearched()
-        {
-            ulong total = 0;
-            foreach (var thread in this)
-                total += thread.SearchObject.stats.nodeCount;
-
-            return total;
-        }
-
         public SearchPool(int initialSize)
         {
             SetSize(initialSize);
+        }
+        
+        public MasterSearchThread Master
+        {
+            get
+            {
+                return (MasterSearchThread)this[0];
+            }
+        }
+
+        public ulong NodesSearched
+        {
+            get
+            {
+                ulong total = 0;
+                foreach (var thread in this)
+                    total += thread.SearchObject.stats.nodeCount;
+
+                return total;
+            }
+        }
+        
+        public void Stop()
+        {
+            Master.SearchObject.stop = true;
+        }
+
+        public void WaitForSeachFinish()
+        {
+            Master.WaitForSearchFinish();
         }
 
         public void SetSize(int expected)
@@ -67,11 +76,7 @@ namespace Chessour
     }
 
     class SearchThread
-    {     
-        public Search SearchObject { get; }
-        public bool Searching { get; private set; }
-        public bool Exit { get; private set; }
-
+    {
         readonly Thread thread;
         readonly Mutex mutex;
 
@@ -86,6 +91,10 @@ namespace Chessour
             thread.Start();
             WaitForSearchFinish();
         }
+
+        public Search SearchObject { get; }
+        public bool Searching { get; private set; }
+        public bool Exit { get; private set; }
 
         public void Abort()
         {
@@ -111,7 +120,12 @@ namespace Chessour
                     Monitor.Wait(mutex);
                 }
         }
-       
+           
+        protected virtual void StartSearch()
+        {
+            SearchObject.StartSearch();
+        }
+
         private void IdleLoop()
         {
             while (true)
@@ -131,12 +145,8 @@ namespace Chessour
                 StartSearch();
             }
         }
-       
-        protected virtual void StartSearch()
-        {
-            SearchObject.StartSearch();
-        }
     }
+
     class MasterSearchThread : SearchThread
     {
         readonly SearchPool pool;
@@ -144,7 +154,7 @@ namespace Chessour
         public MasterSearchThread(SearchPool owner) : base()
         {
             pool = owner;
-            SearchObject.SendInfo = true;
+            SearchObject.sendInfo = true;
         }
 
         protected override void StartSearch()

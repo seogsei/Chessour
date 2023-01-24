@@ -3,9 +3,9 @@
     public enum PieceType
     {
         None = 0,
-        Pawn, Knight, Bishop, Rook, Queen, King,
-        NB,
         AllPieces = 0,
+        Pawn, Knight, Bishop, Rook, Queen, King,
+        NB = 7,
     }
 
     public enum Piece
@@ -13,7 +13,7 @@
         None,
         WhitePawn = PieceType.Pawn, WhiteKnight, WhiteBishop, WhiteRook, WhiteQueen, WhiteKing,
         BlackPawn = PieceType.Pawn + 8, BlackKnight, BlackBishop, BlackRook, BlackQueen, BlackKing,
-        NB
+        NB = 16
     }
 
 
