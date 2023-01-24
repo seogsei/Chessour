@@ -1,13 +1,10 @@
-﻿using System;
-
-namespace Chessour
+﻿namespace Chessour
 {
-    static class Engine
+    internal static class Engine
     {
         public const string Name = "Chessour";
         public const string Author = "Muhammed İkbal Yaman";
-
-        readonly static Stopwatch timer;
+        private static readonly Stopwatch timer;
 
         static Engine()
         {

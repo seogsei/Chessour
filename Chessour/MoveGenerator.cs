@@ -3,7 +3,7 @@ using static Chessour.GenerationType;
 
 namespace Chessour
 {
-    enum GenerationType
+    internal enum GenerationType
     {
         Captures,
         Quiets,
@@ -11,9 +11,9 @@ namespace Chessour
         Evasions,
     }
 
-    ref struct MoveList
+    internal ref struct MoveList
     {
-        readonly Span<MoveScore> moves;
+        private readonly Span<MoveScore> moves;
         public int Count { get; private set; }
 
         public MoveList(Span<MoveScore> buffer)
@@ -58,8 +58,8 @@ namespace Chessour
         }
         public ref struct Enumerator
         {
-            MoveList moveList;
-            int idx;
+            private MoveList moveList;
+            private int idx;
 
             public MoveScore Current => moveList.moves[idx];
 
@@ -76,7 +76,7 @@ namespace Chessour
         }
     }
 
-    static class MoveGenerator
+    internal static class MoveGenerator
     {
         public const int MaxMoveCount = 218;
 

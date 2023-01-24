@@ -37,7 +37,7 @@
         SouthWest = South + West
     }
 
-    static partial class Core
+    public static partial class Core
     {
         public static bool IsValid(Square square)
         {

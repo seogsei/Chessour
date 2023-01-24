@@ -1,13 +1,12 @@
 ﻿using System.Text;
-using Chessour.Types;
 using static Chessour.Bitboards;
 using static Chessour.Types.PieceType;
 
 namespace Chessour
 {
-    static class Evaluation
+    internal static class Evaluation
     {
-        static readonly Value[][] pieceValues = new Value[(int)GamePhase.NB][]
+        private static readonly Value[][] pieceValues = new Value[(int)GamePhase.NB][]
         {
             new Value[(int)Piece.NB]
             {
@@ -21,7 +20,7 @@ namespace Chessour
                 Value.Zero, Value.PawnEG, Value.KnightEG, Value.BishopEG, Value.RookEG, Value.QueenEG, Value.Zero, Value.Zero
             }
         };
-        static readonly Score[][] pieceMobility = new Score[(int)PieceType.NB][]
+        private static readonly Score[][] pieceMobility = new Score[(int)PieceType.NB][]
         {
             Array.Empty<Score>(),
             Array.Empty<Score>(),
@@ -240,7 +239,7 @@ namespace Chessour
                 NB,
             }
 
-            readonly static Score[,] scores = new Score[(int)Term.NB, (int)Color.NB];
+            private static readonly Score[,] scores = new Score[(int)Term.NB, (int)Color.NB];
 
             public static void Clear()
             {

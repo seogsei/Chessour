@@ -2,17 +2,16 @@
 
 namespace Chessour
 {
-    class Search
+    internal class Search
     {
         public readonly RootMoves rootMoves;
         public SearchStats stats;
         public UCI.SearchLimits limits;
         public volatile bool stop;
         public volatile bool sendInfo;
-
-        readonly Position rootPosition;
-        readonly StateInfo rootState;
-        readonly StateInfo[] states;
+        private readonly Position rootPosition;
+        private readonly StateInfo rootState;
+        private readonly StateInfo[] states;
      
         public Search()
         {
@@ -26,7 +25,7 @@ namespace Chessour
             }
         }
 
-        enum NodeType
+        private enum NodeType
         {
             Root,
             PV,
@@ -466,7 +465,7 @@ namespace Chessour
 
         public class RootMoves
         {
-            readonly RootMove[] buffer = new RootMove[MAX_MOVE_COUNT];
+            private readonly RootMove[] buffer = new RootMove[MAX_MOVE_COUNT];
             public int Count { get; private set; }
 
             public bool Contains(Move m)
@@ -506,7 +505,7 @@ namespace Chessour
             }
             public struct Enumerator
             {
-                readonly RootMoves rm;
+                private readonly RootMoves rm;
                 private int idx;
 
                 public RootMove Current { get; private set; }

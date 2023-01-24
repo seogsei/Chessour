@@ -1,10 +1,9 @@
-﻿using System;
-namespace Chessour.Types
+﻿namespace Chessour.Types
 {
     public readonly struct Score
     {
-        readonly short midGame;
-        readonly short endGame;
+        private readonly short midGame;
+        private readonly short endGame;
 
         public Value MidGame { get => (Value)midGame; }
         public Value EndGame { get => (Value)endGame; }

@@ -1,6 +1,4 @@
-﻿using System.Reflection.Metadata;
-
-namespace Chessour.Types
+﻿namespace Chessour.Types
 {
     public enum Value
     {

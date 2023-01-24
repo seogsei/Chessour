@@ -2,14 +2,14 @@
 
 namespace Chessour
 {
-    ref struct MovePicker
+    internal ref struct MovePicker
     {
-        readonly Position position;
-        readonly Move ttMove;
-        readonly Span<MoveScore> moves;
-        Stage stage;
-        int curent;
-        int end;
+        private readonly Position position;
+        private readonly Move ttMove;
+        private readonly Span<MoveScore> moves;
+        private Stage stage;
+        private int curent;
+        private int end;
 
         public MovePicker(Position position, Move ttMove, Span<MoveScore> buffer)
         {
@@ -34,7 +34,7 @@ namespace Chessour
                 stage++;
         }
 
-        enum Stage
+        private enum Stage
         {
             MainTT, CaptureGenerate, Capture, QuietGenerate, Quiet,
             EvasionTT, EvasionGenerate, Evasions,

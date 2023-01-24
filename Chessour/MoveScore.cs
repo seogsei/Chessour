@@ -1,6 +1,6 @@
 ﻿namespace Chessour
 {
-    struct MoveScore
+    internal struct MoveScore
     {
         public MoveScore(Move move)
         {

@@ -3,7 +3,7 @@ using System.Threading;
 
 namespace Chessour
 {
-    sealed class SearchPool : List<SearchThread>
+    internal sealed class SearchPool : List<SearchThread>
     {
         public SearchPool(int initialSize)
         {
@@ -75,10 +75,10 @@ namespace Chessour
         }
     }
 
-    class SearchThread
+    internal class SearchThread
     {
-        readonly Thread thread;
-        readonly Mutex mutex;
+        private readonly Thread thread;
+        private readonly Mutex mutex;
 
         public SearchThread()
         {
@@ -147,9 +147,9 @@ namespace Chessour
         }
     }
 
-    class MasterSearchThread : SearchThread
+    internal class MasterSearchThread : SearchThread
     {
-        readonly SearchPool pool;
+        private readonly SearchPool pool;
 
         public MasterSearchThread(SearchPool owner) : base()
         {

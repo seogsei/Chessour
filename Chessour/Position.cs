@@ -6,17 +6,17 @@ using static Chessour.Types.PieceType;
 
 namespace Chessour
 {
-    sealed class Position
+    internal sealed class Position
     {
-        readonly Piece[] board = new Piece[(int)Square.NB];
-        readonly Bitboard[] colorBitboards = new Bitboard[(int)Color.NB];
-        readonly Bitboard[] typeBitboards = new Bitboard[(int)PieceType.NB];
-        readonly int[] pieceCounts = new int[(int)Piece.NB];
-        readonly CastlingRight[] castlingRightMask = new CastlingRight[(int)Square.NB];
-        readonly Square[] castlingRookSquare = new Square[(int)CastlingRight.NB];
-        readonly Bitboard[] castlingPath = new Bitboard[(int)CastlingRight.NB];
-        StateInfo state;
-        int gamePly;
+        private readonly Piece[] board = new Piece[(int)Square.NB];
+        private readonly Bitboard[] colorBitboards = new Bitboard[(int)Color.NB];
+        private readonly Bitboard[] typeBitboards = new Bitboard[(int)PieceType.NB];
+        private readonly int[] pieceCounts = new int[(int)Piece.NB];
+        private readonly CastlingRight[] castlingRightMask = new CastlingRight[(int)Square.NB];
+        private readonly Square[] castlingRookSquare = new Square[(int)CastlingRight.NB];
+        private readonly Bitboard[] castlingPath = new Bitboard[(int)CastlingRight.NB];
+        private StateInfo state;
+        private int gamePly;
 
         public Position(string fen, StateInfo newSt)
         {
@@ -679,7 +679,7 @@ namespace Chessour
             gamePly--;
         }
 
-        (Bitboard Blockers, Bitboard Pinners) CalculateBlockers(Square target, Color attackers)
+        private (Bitboard Blockers, Bitboard Pinners) CalculateBlockers(Square target, Color attackers)
         {
             Bitboard blockers = 0;
             Bitboard pinners = 0;
@@ -711,7 +711,7 @@ namespace Chessour
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SetPieceAt(Piece piece, Square square)
+        private void SetPieceAt(Piece piece, Square square)
         {
             Bitboard bitboard = square.ToBitboard();
 
@@ -724,7 +724,7 @@ namespace Chessour
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void RemovePieceAt(Square square)
+        private void RemovePieceAt(Square square)
         {
             Piece piece = PieceAt(square);
             Bitboard bitboard = square.ToBitboard();
@@ -739,7 +739,7 @@ namespace Chessour
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void MovePiece(Square from, Square to)
+        private void MovePiece(Square from, Square to)
         {
             Piece piece = PieceAt(from);
             Bitboard fromto = from.ToBitboard() | to.ToBitboard();
@@ -754,7 +754,7 @@ namespace Chessour
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        void SetCheckInfo(StateInfo si)
+        private void SetCheckInfo(StateInfo si)
         {
             (si.BlockersForKing[(int)White], si.Pinners[(int)Black]) = CalculateBlockers(KingSquare(White), Black);
             (si.BlockersForKing[(int)Black], si.Pinners[(int)White]) = CalculateBlockers(KingSquare(Black), White);
@@ -767,8 +767,8 @@ namespace Chessour
             si.CheckSquares[(int)Queen] = si.CheckSquares[(int)Bishop] | si.CheckSquares[(int)Rook];
             si.CheckSquares[(int)King] = 0;
         }
-        
-        void SetState(StateInfo si)
+
+        private void SetState(StateInfo si)
         {
             si.ZobristKey = 0ul;
             si.Checkers = AttackersTo(KingSquare(ActiveColor)) & Pieces(ActiveColor.Flip());
@@ -789,8 +789,8 @@ namespace Chessour
 
             si.ZobristKey ^= Zobrist.CastlingKey(CastlingRights);
         }
-      
-        void Clear()
+
+        private void Clear()
         {
             Array.Clear(board);
             Array.Clear(typeBitboards);
@@ -823,12 +823,12 @@ namespace Chessour
             public readonly Bitboard[] CheckSquares = new Bitboard[(int)PieceType.NB];
         }
 
-        static class Zobrist
+        private static class Zobrist
         {
-            static readonly Key[,] pieceKeys = new Key[(int)Piece.NB, (int)Square.NB];
-            static readonly Key[] castlingKeys = new Key[(int)CastlingRight.NB];
-            static readonly Key[] enPassantKeys = new Key[(int)File.NB];
-            static readonly Key sideKey;
+            private static readonly Key[,] pieceKeys = new Key[(int)Piece.NB, (int)Square.NB];
+            private static readonly Key[] castlingKeys = new Key[(int)CastlingRight.NB];
+            private static readonly Key[] enPassantKeys = new Key[(int)File.NB];
+            private static readonly Key sideKey;
             public static Key PieceKey(Piece p, Square sq) => pieceKeys[(int)p, (int)sq];
             public static Key SideKey => sideKey;
             public static Key CastlingKey(CastlingRight cr) => castlingKeys[(int)cr];
@@ -852,7 +852,7 @@ namespace Chessour
             }
         }
 
-        static class Cuckoo
+        private static class Cuckoo
         {
 
         }

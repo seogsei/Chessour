@@ -1,10 +1,9 @@
 ﻿using System.Collections.Generic;
 using System.Text;
-using Chessour.Utilities;
 
 namespace Chessour
 {
-    static class UCI
+    internal static class UCI
     {
         public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";     
         public const int NormalizeToPawn = (int)Value.PawnMG;

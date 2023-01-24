@@ -1,9 +1,9 @@
 ﻿namespace Chessour.Utilities
 {
-    ref struct StringReader
+    internal ref struct StringReader
     {
-        readonly ReadOnlySpan<char> str;
-        int position;
+        private readonly ReadOnlySpan<char> str;
+        private int position;
 
         public StringReader(string str) : this(str.AsSpan())
         {

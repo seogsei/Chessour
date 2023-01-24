@@ -1,5 +1,4 @@
 ﻿using System.Numerics;
-using Chessour.Types;
 
 using static Chessour.Types.Color;
 using static Chessour.Types.Direction;
@@ -31,15 +30,14 @@ namespace Chessour
         Rank8 = Rank1 << (8 * 7),
     }
 
-    static class Bitboards
+    internal static class Bitboards
     {
-        static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
-        static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
-
-        static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
-        static readonly Bitboard[,] pseudoAttacks = new Bitboard[(int)PieceType.NB, (int)Square.NB];
+        private static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
+        private static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
+        private static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
+        private static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
+        private static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
+        private static readonly Bitboard[,] pseudoAttacks = new Bitboard[(int)PieceType.NB, (int)Square.NB];
 
         static Bitboards()
         {
@@ -332,7 +330,7 @@ namespace Chessour
             }
         }
 
-        struct MagicStruct
+        private struct MagicStruct
         {
             public Bitboard mask;
             public ulong magic;

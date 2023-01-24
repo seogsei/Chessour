@@ -2,10 +2,9 @@
 
 namespace Chessour
 {
-    static class PSQT
+    internal static class PSQT
     {
-
-        static readonly Score[][][] bonuses = new Score[(int)PieceType.NB][][]
+        private static readonly Score[][][] bonuses = new Score[(int)PieceType.NB][][]
         {
             //NoPiece
             Array.Empty<Score[]>(),
@@ -88,8 +87,7 @@ namespace Chessour
                 new Score[(int)File.NB / 2]{ new( 59, 11), new( 80, 60), new( 40, 75), new(  0, 80) },
             },
         };
-
-        static readonly Score[,] psqt = new Score[(int)Piece.NB, (int)Square.NB];
+        private static readonly Score[,] psqt = new Score[(int)Piece.NB, (int)Square.NB];
 
 
         static PSQT()

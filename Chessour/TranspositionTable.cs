@@ -1,11 +1,11 @@
-﻿using System.Runtime.InteropServices;
-using System.Numerics;
+﻿using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace Chessour
 {
-    class TranspositionTable
+    internal class TranspositionTable
     {
-        Entry[] entries;
+        private Entry[] entries;
 
         public TranspositionTable(uint initialSizeInMB = 8)
         {
