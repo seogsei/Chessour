@@ -8,23 +8,17 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
-		Debug|ARM64 = Debug|ARM64
 		Debug|x64 = Debug|x64
 		Release|Any CPU = Release|Any CPU
-		Release|ARM64 = Release|ARM64
 		Release|x64 = Release|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|ARM64.ActiveCfg = Debug|ARM64
-		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|ARM64.Build.0 = Debug|ARM64
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|x64.ActiveCfg = Debug|x64
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Debug|x64.Build.0 = Debug|x64
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|Any CPU.Build.0 = Release|Any CPU
-		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|ARM64.ActiveCfg = Release|ARM64
-		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|ARM64.Build.0 = Release|ARM64
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|x64.ActiveCfg = Release|x64
 		{995CD0F2-370F-4662-92A6-A25FC3C8310F}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection

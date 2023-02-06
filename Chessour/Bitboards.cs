@@ -1,8 +1,7 @@
 ﻿using System.Numerics;
-
-using static Chessour.Types.Color;
-using static Chessour.Types.Direction;
-using static Chessour.Types.PieceType;
+using static Chessour.Color;
+using static Chessour.Direction;
+using static Chessour.PieceType;
 
 namespace Chessour
 {
@@ -34,6 +33,7 @@ namespace Chessour
     {
         private static readonly MagicStruct[] rookMagics = new MagicStruct[(int)Square.NB];
         private static readonly MagicStruct[] bishopMagics = new MagicStruct[(int)Square.NB];
+
         private static readonly int[,] distance = new int[(int)Square.NB, (int)Square.NB];
         private static readonly Bitboard[,] between = new Bitboard[(int)Square.NB, (int)Square.NB];
         private static readonly Bitboard[,] line = new Bitboard[(int)Square.NB, (int)Square.NB];
@@ -62,6 +62,8 @@ namespace Chessour
                     m.mask = SliderAttacks(pt, s, 0) & ~irrelevant;
                     m.shift = 64 - m.mask.PopulationCount();
 
+                    m.attacks = new Bitboard[1ul << m.mask.PopulationCount()];
+
                     size = 0;
                     Bitboard b = 0;
 
@@ -71,11 +73,15 @@ namespace Chessour
                         occupancies[size] = b;
                         references[size] = SliderAttacks(pt, s, b);
 
+                        if (System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported)
+                            m.attacks[m.CalculateIndex(b)] = references[size];
+
                         size++;
                         b = (ulong)b - m.mask & m.mask;
                     } while (b != 0);
 
-                    m.attacks = new Bitboard[size];
+                    if (System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported)
+                        continue;
 
                     for (int i = 0; i < size;)
                     {
@@ -84,7 +90,8 @@ namespace Chessour
 
                         for (attemptCount++, i = 0; i < size; i++)
                         {
-                            int index = m.CalculateIndex(occupancies[i]);
+                            //Span doesn't allows us to index using UInt64
+                            int index = (int)m.CalculateIndex(occupancies[i]);
 
                             //Check to see if this index is already occupied in this run
                             if (epoch[index] < attemptCount)
@@ -111,7 +118,7 @@ namespace Chessour
                     Square sq = square;
 
                     while (sq.SafeStep(d) != 0 && (occupancy & sq.ToBitboard()) == 0)
-                        attacks |= (sq = sq.Shift(d)).ToBitboard();
+                        attacks |= (sq += (int)d).ToBitboard();
                 }
 
                 return attacks;
@@ -132,43 +139,54 @@ namespace Chessour
                 foreach (Direction d in stackalloc[] { (Direction)17, (Direction)15, (Direction)10, (Direction)6, (Direction)(-6), (Direction)(-10), (Direction)(-15), (Direction)(-17) })
                     pseudoAttacks[(int)Knight, (int)s1] |= s1.SafeStep(d); //>Knight
 
-                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Bishop, (int)s1] = Attacks(Bishop, s1, 0); //Bishop
-                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Rook, (int)s1] = Attacks(Rook, s1, 0); //Rook
+                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Bishop, (int)s1] = BishopAttacks(s1, Bitboard.Empty); //Bishop
+                pseudoAttacks[(int)Queen, (int)s1] |= pseudoAttacks[(int)Rook, (int)s1] = RookAttacks(s1, Bitboard.Empty); //Rook
 
                 foreach (Direction d in stackalloc[] { North, East, West, South, NorthEast, NorthWest, SouthEast, SouthWest })
                     pseudoAttacks[(int)King, (int)s1] |= s1.SafeStep(d); //King
 
+                for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
+                {
+                    if ((pseudoAttacks[(int)Bishop, (int)s1] & s2.ToBitboard()) != 0)
+                    {
+                        line[(int)s1, (int)s2] = BishopAttacks(s1, Bitboard.Empty) & BishopAttacks(s2, Bitboard.Empty) | s1.ToBitboard() | s2.ToBitboard();
+                        between[(int)s1, (int)s2] = BishopAttacks(s1, s2.ToBitboard()) & BishopAttacks(s2, s1.ToBitboard());
+                    }
 
-                foreach (PieceType pt in stackalloc[] { Bishop, Rook })
-                    for (Square s2 = Square.a1; s2 <= Square.h8; s2++)
-                        if ((pseudoAttacks[(int)pt, (int)s1] & s2.ToBitboard()) != 0)
-                        {
-                            line[(int)s1, (int)s2] = Attacks(pt, s1, 0) & Attacks(pt, s2, 0) | s1.ToBitboard() | s2.ToBitboard();
-                            between[(int)s1, (int)s2] = Attacks(pt, s1, s2.ToBitboard()) & Attacks(pt, s2, s1.ToBitboard());
-                        }
+                    if ((pseudoAttacks[(int)Rook, (int)s1] & s2.ToBitboard()) != 0)
+                    {
+                        line[(int)s1, (int)s2] = RookAttacks(s1, Bitboard.Empty) & RookAttacks(s2, Bitboard.Empty) | s1.ToBitboard() | s2.ToBitboard();
+                        between[(int)s1, (int)s2] = RookAttacks(s1, s2.ToBitboard()) & RookAttacks(s2, s1.ToBitboard());
+                    }
+                }               
             }
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int Distance(Square s1, Square s2)
         {
             return distance[(int)s1, (int)s2];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard Between(Square s1, Square s2)
         {
             return between[(int)s1, (int)s2];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard Line(Square s1, Square s2)
         {
             return line[(int)s1, (int)s2];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool Alligned(Square s1, Square s2, Square s3)
         {
             return (Line(s1, s2) & s3.ToBitboard()) != 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static BitboardEnumerator GetEnumerator(this Bitboard b)
         {
             return new(b);
@@ -176,7 +194,7 @@ namespace Chessour
 
         public static Bitboard SafeStep(this Square square, Direction direction)
         {
-            Square to = square.Shift(direction);
+            Square to = square + (int)direction;
 
             return IsValid(to) && Distance(square, to) <= 2 ? to.ToBitboard() : 0;
         }
@@ -197,47 +215,56 @@ namespace Chessour
                 _ => throw new InvalidOperationException()
             };
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorth(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard << 8);
         }
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouth(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard >> 8);
         }
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftEast(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard << 1) & ~Bitboard.FileA;
         }
-
+      
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftWest(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard >> 1) & ~Bitboard.FileH;
         }
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorthEast(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard << 9) & ~Bitboard.FileA;
         }
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftNorthWest(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard << 7) & ~Bitboard.FileH;
         }
-
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouthEast(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard >> 7) & ~Bitboard.FileA;
         }
-
+       
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ShiftSouthWest(this Bitboard bitboard)
         {
             return (Bitboard)((ulong)bitboard >> 9) & ~Bitboard.FileH;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Square PopSquare(ref Bitboard bitboard)
         {
             Square square = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit
@@ -247,33 +274,37 @@ namespace Chessour
             return square;
         }
 
-        public static Square LeastSignificantSquare(this Bitboard bitboard)
-        {
-            return (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard LeastSignificantBit(this Bitboard bitboard)
         {
             return bitboard ^ (bitboard - 1);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Square LeastSignificantSquare(this Bitboard bitboard)
+        {
+            return (Square)BitOperations.TrailingZeroCount((ulong)bitboard);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static int PopulationCount(this Bitboard bitboard)
         {
             return BitOperations.PopCount((ulong)bitboard);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool MoreThanOne(this Bitboard bitboard)
         {
             return (bitboard & (bitboard - 1)) != 0;
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard PawnAttacks(Color side, Square square)
         {
-            Debug.Assert(side.IsValid() && IsValid(square));
-
             return pseudoAttacks[(int)side, (int)square];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard Attacks(PieceType pieceType, Square square)
         {
             Debug.Assert(pieceType != None && pieceType != Pawn, "Invalid piece type");
@@ -281,28 +312,49 @@ namespace Chessour
             return pseudoAttacks[(int)pieceType, (int)square];
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Bitboard Attacks(PieceType pt, Square s, Bitboard occupancy)
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        public static Bitboard Attacks(PieceType pt, Square square, Bitboard occupancy)
         {
             return pt switch
             {
-                Bishop => bishopMagics[(int)s].GetAttack(occupancy),
-                Rook => rookMagics[(int)s].GetAttack(occupancy),
-                Queen => bishopMagics[(int)s].GetAttack(occupancy) | rookMagics[(int)s].GetAttack(occupancy),
-                _ => Attacks(pt, s),
+                Bishop => BishopAttacks(square, occupancy),
+                Rook => RookAttacks(square, occupancy),
+                Queen => QueenAttacks(square, occupancy),
+                _ => Attacks(pt, square),
             };
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Bitboard BishopAttacks(Square square, Bitboard occupancy)
+        {
+            return bishopMagics[(int)square].GetAttack(occupancy);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Bitboard RookAttacks(Square square, Bitboard occupancy)
+        {
+            return rookMagics[(int)square].GetAttack(occupancy);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Bitboard QueenAttacks(Square square, Bitboard occupancy)
+        {
+            return bishopMagics[(int)square].GetAttack(occupancy) | rookMagics[(int)square].GetAttack(occupancy);
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ToBitboard(this Square square)
         {
             return (Bitboard)(1ul << (int)square);
         }
-        
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ToBitboard(this File file)
         {
             return (Bitboard)((ulong)Bitboard.FileA << (int)file);
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ToBitboard(this Rank rank)
         {
             return (Bitboard)((ulong)Bitboard.Rank1 << ((int)rank * 8));
@@ -332,19 +384,27 @@ namespace Chessour
 
         private struct MagicStruct
         {
-            public Bitboard mask;
-            public ulong magic;
-            public int shift;
             public Bitboard[] attacks;
+            public Bitboard mask;
 
-            public readonly int CalculateIndex(Bitboard occupancy)
-            {
-                return (int)((ulong)(occupancy & mask) * magic >> shift);
+            //Required if PEXT is not supported
+            public ulong magic;
+            public int shift;          
+
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            public readonly ulong CalculateIndex(Bitboard occupancy)
+            {                               
+                if (System.Runtime.Intrinsics.X86.Bmi2.X64.IsSupported)
+                    return System.Runtime.Intrinsics.X86.Bmi2.X64.ParallelBitExtract((ulong)occupancy, (ulong)mask);
+                
+                //Default fallback
+                return ((ulong)(occupancy & mask) * magic >> shift);
             }
 
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public readonly Bitboard GetAttack(Bitboard occupancy)
             {
-                return attacks[(int)((ulong)(occupancy & mask) * magic >> shift)];
+                return attacks[CalculateIndex(occupancy)];
             }
         }
     }

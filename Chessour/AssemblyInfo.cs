@@ -1,10 +1,9 @@
-global using Chessour.Types;
 global using Chessour.Utilities;
 global using System;
 global using System.Diagnostics;
 global using System.Runtime.CompilerServices;
-global using static Chessour.Constants;
-global using static Chessour.Types.Core;
+global using static Chessour.SquareConstants;
+
 using System.Runtime.InteropServices;
 
 [assembly: ComVisible(false)]

@@ -1,268 +1,231 @@
-﻿using System.Collections.Generic;
+﻿using Chessour.Evaluation;
+using Chessour.MoveGeneration;
+using Chessour.Search;
 using System.Text;
 
-namespace Chessour
+namespace Chessour;
+
+internal static class UCI
 {
-    internal static class UCI
+    public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";     
+    public const int NormalizeToPawn = Chessour.Evaluation.ValueConstants.PawnMGValue;
+
+    public static string PV(SearchThread bestThread, Depth depth)
     {
-        public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";     
-        public const int NormalizeToPawn = (int)Value.PawnMG;
+        StringBuilder sb = new(1024);
 
-        public static string ParsePV(Move[] pv)
+        RootMoves rootMoves = bestThread.rootMoves;
+        ulong nodesSearched = Engine.Threads.NodesSearched;
+        var elapsed = Engine.Time.Elapsed + 1;
+
+        sb.Append("info");
+        sb.Append(" depth ");
+        sb.Append(depth);
+        sb.Append(" seldepth ");
+        sb.Append(rootMoves[0].SelectiveDepth);
+        sb.Append(" score ");
+        sb.Append(rootMoves[0].UCIScore.ToUCIString());
+
+        sb.Append(" nodes ");
+        sb.Append(nodesSearched);
+        sb.Append(" nps ");
+        sb.Append(nodesSearched * 1000 / (ulong)elapsed);
+        sb.Append(" time ");
+        sb.Append(elapsed);
+
+        sb.Append(" pv");
+        foreach (Move m in rootMoves[0].pv)
         {
-            StringBuilder sb = new(1024);
+            sb.Append(' ');
+            sb.Append(m);
+        }     
 
-            int i = -1;
-            while (pv[++i] != Move.None)
+        return sb.ToString();
+    }
+
+    public static Move ParseMove(Position position, string str)
+    {
+        MoveList moveList = new(position, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
+
+        foreach (Move m in moveList)
+            if (str == m.ToString())
+                return m;
+
+        return Move.None;
+    }
+
+    public static void Loop(string[] args)
+    {
+        Position position = new(StartFEN, new());
+
+        string command;
+        do
+        {
+            UCIStream ss = args.Length == 0 ? new(Console.ReadLine() ?? "quit")
+                                               : new(string.Join(' ', args));
+
+            ss.SkipWhiteSpace();
+            ss.Extract(out command);
+
+            switch (command)
             {
-                if (i != 0)
-                    sb.Append(' ');
-                sb.Append(pv[i].LongAlgebraicNotation());
+                case "uci":
+                    Console.WriteLine($"id name {Engine.Name}");
+                    Console.WriteLine($"id author {Engine.Author}");
+                    Console.WriteLine($"uciok");
+                    break;
+                case "debug":
+                    break;
+                case "isready":
+                    Console.WriteLine("readyok");
+                    break;
+                case "setoption":
+                    break;
+                case "ucinewgame":
+                    break;
+                case "position":
+                    Position(ref ss, position);
+                    break;
+                case "go":
+                    Go(ref ss, position);
+                    break;
+                case "quit":
+                case "stop":
+                    Engine.Stop = true;
+                    break;
+                case "ponderhit":
+                    break;
+                case "bench":
+                    Bench(ref ss, position);
+                    break;
+                case "eval":
+                    Eval(position);
+                    break;
+                default:
+                    Console.WriteLine($"Unrecognized command: {command}");
+                    break;
             }
 
-            return sb.ToString();
-        }
+        } while (command != "quit" && args.Length == 0);
+    }
 
-        public static Move ParseMove(Position position, string str)
+    private static void Position(ref UCIStream ss, Position position)
+    {
+        ss.Extract(out string token);
+
+        string fen;
+        if (token == "startpos")
         {
-            MoveList moveList = new(position, stackalloc MoveScore[MAX_MOVE_COUNT]);
-
-            foreach (Move m in moveList)
-                if (str == m.LongAlgebraicNotation())
-                    return m;
-
-            return Move.None;
+            fen = StartFEN;
+            ss.Extract(out string _);
         }
+        else if (token == "fen")
+            fen = ss.ReadUntil("moves");
+        else
+            return;
 
-        public static string LongAlgebraicNotation(this Move move)
+        position.Set(fen, new());
+
+        //Handle Moves
+        while (ss.Extract(out token))
         {
-            Square from = move.FromSquare();
-            Square to = move.ToSquare();
-
-            if (move == Move.None)
-                return "(none)";
-
-            if (move == Move.Null)
-                return "0000";
-
-            if (move.TypeOf() == MoveType.Castling)
-                to = MakeSquare(to > from ? File.g : File.c, from.GetRank());
-
-            string moveString = string.Concat(from, to);
-            if (move.TypeOf() == MoveType.Promotion)
-                moveString += " pnbrqk"[(int)move.PromotionPiece()];
-
-            return moveString;
-        }
-
-        public static string ToString(Value v)
-        {
-            StringBuilder sb = new();
-
-            if (Math.Abs((int)v) < (int)Value.MateInMaxPly)
-            {
-                sb.Append("cp ");
-                sb.Append((int)v * 100 / NormalizeToPawn);
-            }
-            else
-            {
-                sb.Append("mate ");
-                sb.Append((v > 0 ? Value.Mate - v + 1 : Value.Mated - v) / 2);
-            }
-
-            return sb.ToString();
-        }
-
-        public static void Loop(string[] args)
-        {
-            Position position = new(StartFEN, new());
-
-            string command;
-            do
-            {
-                StringReader ss = args.Length == 0 ? new(Console.ReadLine() ?? "quit")
-                                                   : new(string.Join(' ', args));
-
-                ss.SkipWhiteSpace();
-                ss.Extract(out command);
-
-                switch (command)
-                {
-                    case "uci":
-                        Console.WriteLine($"""
-                            id name {Engine.Name}
-                            id author {Engine.Author}
-                            uciok
-                            """);
-                        break;
-                    case "debug":
-                        break;
-                    case "isready":
-                        Console.WriteLine("readyok");
-                        break;
-                    case "setoption":
-                        break;
-                    case "ucinewgame":
-                        break;
-                    case "position":
-                        Position(ref ss, position);
-                        break;
-                    case "go":
-                        Go(ref ss, position);
-                        break;
-                    case "quit":
-                    case "stop":
-                        Engine.Threads.Stop();
-                        break;
-                    case "ponderhit":
-                        break;
-                    case "bench":
-                        Bench(ref ss, position);
-                        break;
-                    case "eval":
-                        Eval(position);
-                        break;
-                    default:
-                        Console.WriteLine($"Unrecognized command: {command}");
-                        break;
-                }
-
-            } while (command != "quit" && args.Length == 0);
-        }
-
-        private static void Position(ref StringReader ss, Position position)
-        {
-            ss.Extract(out string token);
-
-            string fen;
-            if (token == "startpos")
-            {
-                fen = StartFEN;
-                ss.Extract(out string _);
-            }
-            else if (token == "fen")
-                fen = ss.ReadUntil("moves");
+            Move m = ParseMove(position, token);
+            if (m != Move.None)
+                position.MakeMove(m, new Position.StateInfo());
             else
                 return;
+        }
+    }
 
-            position.Set(fen, new());
+    private static void Go(ref UCIStream ss, Position position)
+    {
+        Search.Limits limits = new()
+        {
+            startTime = Engine.Now
+        };
 
-            //Handle Moves
-            while (ss.Extract(out token))
+        bool ponder = false;
+
+        while (ss.Extract(out string token))
+            switch (token)
             {
-                Move m = ParseMove(position, token);
-                if (m != Move.None)
-                    position.MakeMove(m, new Position.StateInfo());
-                else
-                    return;
-            }
-        }
-
-        private static void Go(ref StringReader ss, Position position)
-        {
-            SearchLimits limits = new();
-            bool ponder = false;
-
-            while (ss.Extract(out string token))
-                switch (token)
-                {
-                    case "searchmoves":
-                        limits.searchMoves = new();
-                        while (ss.Extract(out token))
-                            limits.searchMoves.Add(ParseMove(position, token));
-                        break;
-                    case "ponder":
-                        ponder = true;
-                        break;
-                    case "wtime":
-                        ss.Extract(out limits.whiteTime);
-                        break;
-                    case "btime":
-                        ss.Extract(out limits.blackTime);
-                        break;
-                    case "winc":
-                        ss.Extract(out limits.whiteIncrement);
-                        break;
-                    case "binc":
-                        ss.Extract(out limits.blackIncrement);
-                        break;
-                    case "movestogo":
-                        ss.Extract(out limits.movesToGo);
-                        break;
-                    case "depth":
-                        ss.Extract(out limits.depth);
-                        break;
-                    case "nodes":
-                        ss.Extract(out limits.nodes);
-                        break;
-                    case "mate":
-                        ss.Extract(out limits.mate);
-                        break;
-                    case "movetime":
-                        ss.Extract(out limits.moveTime);
-                        break;
-                    case "infinite":
-                        limits.infinite = true;
-                        break;
-                    case "perft":
-                        ss.Extract(out limits.perft);
-                        break;
-                }
-
-            Engine.Threads.StartThinking(position, in limits, ponder);
-        }
-
-        private static void Eval(Position position)
-        {
-            Evaluation.Evaluate(position, true);
-
-            Console.WriteLine(Evaluation.Trace.ToString());
-        }
-
-        private static void Bench(ref StringReader ss, Position position)
-        {
-            ulong nodes = 0;
-
-            long elapsed = Engine.Now;
-            ss.Extract(out string token);
-
-
-            if (token == "go")
-            {
-                Console.WriteLine($"\nPosition ({position.FEN()})");
-
-                Go(ref ss, position);
-
-                Engine.Threads.WaitForSeachFinish();
-                nodes += Engine.Threads.NodesSearched;
+                case "searchmoves":
+                    limits.searchMoves = new();
+                    while (ss.Extract(out token))
+                        limits.searchMoves.Add(ParseMove(position, token));
+                    break;
+                case "ponder":
+                    ponder = true;
+                    break;
+                case "wtime":
+                    ss.Extract(out limits.whiteTime);
+                    break;
+                case "btime":
+                    ss.Extract(out limits.blackTime);
+                    break;
+                case "winc":
+                    ss.Extract(out limits.whiteIncrement);
+                    break;
+                case "binc":
+                    ss.Extract(out limits.blackIncrement);
+                    break;
+                case "movestogo":
+                    ss.Extract(out limits.movesToGo);
+                    break;
+                case "depth":
+                    ss.Extract(out limits.depth);
+                    break;
+                case "nodes":
+                    ss.Extract(out limits.nodes);
+                    break;
+                case "mate":
+                    ss.Extract(out limits.mate);
+                    break;
+                case "movetime":
+                    ss.Extract(out limits.moveTime);
+                    break;
+                case "infinite":
+                    limits.infinite = true;
+                    break;
+                case "perft":
+                    ss.Extract(out limits.perft);
+                    break;
             }
 
+        Engine.StartThinking(position, in limits);
+    }
 
-            elapsed = Engine.Now - elapsed + 1;
+    private static void Eval(Position position)
+    {
+        Evaluator.Evaluate(position, true);
 
-            Console.WriteLine($"""
+        Console.WriteLine(Evaluator.Trace.ToString());
+    }
+
+    private static void Bench(ref UCIStream ss, Position position)
+    {
+        ulong nodes = 0;
+
+        long elapsed = Engine.Now;
+        ss.Extract(out string token);
+
+        if (token == "go")
+        {
+            Console.WriteLine($"\nPosition ({position.FEN()})");
+
+            Go(ref ss, position);
+
+            Engine.Threads.WaitForSeachFinish();
+            nodes += Engine.Threads.NodesSearched;
+        }
+
+        elapsed = Engine.Now - elapsed + 1;
+
+        Console.WriteLine($"""
 
                 Total time (ms) : {elapsed}
                 Nodes searched : {nodes}
                 Nps : {1000 * nodes / (ulong)elapsed}
                 """);
-        }
-
-        public struct SearchLimits
-        {
-            public List<Move>? searchMoves;
-            public int whiteTime;
-            public int blackTime;
-            public int whiteIncrement;
-            public int blackIncrement;
-            public int movesToGo;
-            public Depth depth;
-            public int nodes;
-            public int mate;
-            public int moveTime;
-            public bool infinite;
-
-            public int perft;
-        }
     }
 }

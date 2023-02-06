@@ -1,17 +1,17 @@
-﻿namespace Chessour
+﻿namespace Chessour.Search
 {
     internal struct MoveScore
     {
         public MoveScore(Move move)
         {
-            this.Move = move;
+            Move = move;
             Score = 0;
         }
 
         public MoveScore(Move move, int score)
         {
-            this.Move = move;
-            this.Score = score;
+            Move = move;
+            Score = score;
         }
 
         public Move Move { get; init; }
@@ -31,7 +31,6 @@
         {
             return lhs.Score < rhs.Score;
         }
-
         public static bool operator >(MoveScore lhs, MoveScore rhs)
         {
             return lhs.Score > rhs.Score;

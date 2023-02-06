@@ -1,4 +1,4 @@
-﻿namespace Chessour.Types
+﻿namespace Chessour
 {
     public enum Square
     {
@@ -14,16 +14,6 @@
         NB
     }
 
-    public enum File
-    {
-        a, b, c, d, e, f, g, h, NB
-    }
-
-    public enum Rank
-    {
-        R1, R2, R3, R4, R5, R6, R7, R8, NB
-    }
-
     public enum Direction
     {
         North = 8,
@@ -37,7 +27,17 @@
         SouthWest = South + West
     }
 
-    public static partial class Core
+    public enum File
+    {
+        a, b, c, d, e, f, g, h, NB
+    }
+
+    public enum Rank
+    {
+        R1, R2, R3, R4, R5, R6, R7, R8, NB
+    }
+
+    public static class SquareConstants
     {
         public static bool IsValid(Square square)
         {
@@ -60,18 +60,6 @@
         public static Rank GetRank(this Square square)
         {
             return (Rank)((int)square >> 3);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Square Shift(this Square square, Direction direction)
-        {
-            return square + (int)direction;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Square NegativeShift(this Square square, Direction direction)
-        {
-            return square - (int)direction;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -98,17 +86,11 @@
             return square ^ Square.h1;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Direction PawnPush(Color side)
-        {
-            return side == Color.White ? Direction.North : Direction.South;
-        }
-
         public static int EdgeDistance(this File file)
         {
             return Math.Min((int)file, (int)File.h - (int)file);
         }
-     
+
         public static int EdgeDistance(this Rank rank)
         {
             return Math.Min((int)rank, (int)Rank.R8 - (int)rank);

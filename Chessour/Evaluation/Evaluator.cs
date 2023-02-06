@@ -1,26 +1,13 @@
 ﻿using System.Text;
 using static Chessour.Bitboards;
-using static Chessour.Types.PieceType;
+using static Chessour.Evaluation.ValueConstants;
+using static Chessour.PieceType;
 
-namespace Chessour
+namespace Chessour.Evaluation
 {
-    internal static class Evaluation
+    internal static class Evaluator
     {
-        private static readonly Value[][] pieceValues = new Value[(int)GamePhase.NB][]
-        {
-            new Value[(int)Piece.NB]
-            {
-                Value.Zero, Value.PawnMG, Value.KnightMG, Value.BishopMG, Value.RookMG, Value.QueenMG, Value.Zero, Value.Zero,
-                Value.Zero, Value.PawnMG, Value.KnightMG, Value.BishopMG, Value.RookMG, Value.QueenMG, Value.Zero, Value.Zero
-
-            },
-            new Value[(int)Piece.NB]
-            {
-                Value.Zero, Value.PawnEG, Value.KnightEG, Value.BishopEG, Value.RookEG, Value.QueenEG, Value.Zero, Value.Zero,
-                Value.Zero, Value.PawnEG, Value.KnightEG, Value.BishopEG, Value.RookEG, Value.QueenEG, Value.Zero, Value.Zero
-            }
-        };
-        private static readonly Score[][] pieceMobility = new Score[(int)PieceType.NB][]
+        private static readonly Score[][] pieceMobility = new Score[(int)NB][]
         {
             Array.Empty<Score>(),
             Array.Empty<Score>(),
@@ -46,113 +33,16 @@ namespace Chessour
                             new(0, 0), new(0, 0), new(0, 0), new(0, 0), new(0, 0),
                             new(0, 0), new(0, 0), new(0, 0)  },
         };
-       
-        public static Value PieceValue(GamePhase phase, Piece piece)
-        {
-            return pieceValues[(int)phase][(int)piece];
-        }
-       
-        public static bool SeeGe(this Position position, Move m, Value threshold = 0)
-        {
-            if (m.TypeOf() != MoveType.Quiet)
-                return 0 >= threshold;
 
-            Square from = m.FromSquare();
-            Square to = m.ToSquare();
-
-            int swap = PieceValue(GamePhase.MidGame, position.PieceAt(to)) - threshold;
-            if (swap < 0)
-                return false;
-
-            swap = (int)PieceValue(GamePhase.MidGame, position.PieceAt(from)) - swap;
-            if (swap <= 0)
-                return true;
-
-
-            Color side = position.ActiveColor;
-            Bitboard occupied = position.Pieces() ^ from.ToBitboard() ^ to.ToBitboard();
-            Bitboard attackers = position.AttackersTo(to, occupied);
-            Bitboard sideAttackers, bb;
-            int result = 1;
-
-            while (true)
-            {
-                side = side.Flip();
-                attackers &= occupied;
-
-                if ((sideAttackers = attackers & position.Pieces(side)) == 0)
-                    break;
-
-
-                if ((position.Pinners(side.Flip()) & occupied) != 0)
-                {
-                    sideAttackers &= ~position.BlockersForKing(side);
-
-                    if (sideAttackers == 0)
-                        break;
-                }
-
-                result ^= 1;
-
-                if ((bb = sideAttackers & position.Pieces(Pawn)) != 0)
-                {
-                    if ((swap = (int)Value.PawnMG - swap) < result)
-                        break;
-
-                    occupied ^= bb.LeastSignificantBit();
-                    attackers |= Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen);
-                }
-                else if ((bb = sideAttackers & position.Pieces(Knight)) != 0)
-                {
-                    if ((swap = (int)Value.KnightMG - swap) < result)
-                        break;
-
-                    occupied ^= bb.LeastSignificantBit();
-                }
-                else if ((bb = sideAttackers & position.Pieces(Bishop)) != 0)
-                {
-                    if ((swap = (int)Value.BishopMG - swap) < result)
-                        break;
-
-                    occupied ^= bb.LeastSignificantBit();
-                    attackers |= Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen);
-                }
-                else if ((bb = sideAttackers & position.Pieces(Rook)) != 0)
-                {
-                    if ((swap = (int)Value.RookMG - swap) < result)
-                        break;
-
-                    occupied ^= bb.LeastSignificantBit();
-                    attackers |= Attacks(Rook, to, occupied) & position.Pieces(Rook, Queen);
-                }
-                else if ((bb = sideAttackers & position.Pieces(Queen)) != 0)
-                {
-                    if ((swap = (int)Value.QueenMG - swap) < result)
-                        break;
-
-                    occupied ^= bb.LeastSignificantBit();
-                    attackers |= (Attacks(Bishop, to, occupied) & position.Pieces(Bishop, Queen))
-                              | (Attacks(Rook, to, occupied) & position.Pieces(Rook, Queen));
-                }
-                else
-                {
-                    result ^= (attackers & ~position.Pieces(side)) != 0 ? 1 : 0;
-                    break;
-                }
-            }
-            return result > 0;
-        }
-
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static double ToPawnValue(Value evaluation)
         {
-            return (int)evaluation / (double)Value.PawnMG;
+            return evaluation / (double)PawnMGValue;
         }
-       
+
         public static Value Evaluate(Position position, bool trace = false)
         {
-            //return new EvaluationContainer(position).Evaluate();
-            if (position.IsCheck())
-                return Value.Min;
+            Debug.Assert(!position.IsCheck());
 
             if (trace)
                 Trace.Clear();
@@ -166,9 +56,8 @@ namespace Chessour
                 Trace.Add(Trace.Term.Material, Color.White, position.PSQScore);
             }
 
-
             Value v = TaperedEval(score, position, trace);
-            return position.ActiveColor == Color.White ? v : v.Negate();
+            return position.ActiveColor == Color.White ? v : -v;
         }
 
         private static Value TaperedEval(Score score, Position position, bool trace)
@@ -176,17 +65,11 @@ namespace Chessour
             Value mg = score.MidGame;
             Value eg = score.EndGame;
 
-            PhaseValues phase = PhaseValues.Total;
+            Phase phase = position.Phase;
 
-            phase -= (position.PieceCount(MakePiece(Color.White, Pawn)) + position.PieceCount(MakePiece(Color.Black, Pawn))) * (int)PhaseValues.Pawn;
-            phase -= (position.PieceCount(MakePiece(Color.White, Knight)) + position.PieceCount(MakePiece(Color.Black, Knight))) * (int)PhaseValues.Knight;
-            phase -= (position.PieceCount(MakePiece(Color.White, Bishop)) + position.PieceCount(MakePiece(Color.Black, Bishop))) * (int)PhaseValues.Bishop;
-            phase -= (position.PieceCount(MakePiece(Color.White, Rook)) + position.PieceCount(MakePiece(Color.Black, Rook))) * (int)PhaseValues.Rook;
-            phase -= (position.PieceCount(MakePiece(Color.White, Queen)) + position.PieceCount(MakePiece(Color.Black, Queen))) * (int)PhaseValues.Queen;
+            phase = (Phase)(((int)phase * 256 + (int)Phase.Total / 2) / (int)Phase.Total);
 
-            phase = (PhaseValues)(((int)phase * 256 + ((int)PhaseValues.Total / 2)) / (int)PhaseValues.Total);
-
-            Value v = (Value)((((int)mg * (256 - (int)phase)) + ((int)eg * (int)phase)) / 256);
+            Value v = (eg * (256 - (int)phase) + mg * (int)phase) / 256;
 
             if (trace)
                 Trace.Add(Trace.Term.Total, Color.White, score);

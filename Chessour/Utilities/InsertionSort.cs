@@ -10,16 +10,16 @@ namespace Chessour.Utilities
         }
         public static void PartialInsertionSort<T>(Span<T> buffer, int start, int end) where T : IArithmeticComparable<T>
         {
-            for (int i = 1; i < end; i++)
+            for (int i = start + 1; i < end; i++)
             {
-                T value = buffer[i];
+                T key = buffer[i];
                 int j = i - 1;
-                while (j >= start && buffer[j] < value)
+                for (; j >= start && buffer[j] < key; j--)
                 {
                     buffer[j + 1] = buffer[j];
-                    j--;
                 }
-                buffer[j + 1] = value;
+
+                buffer[j + 1] = key;
             }
         }
 
@@ -29,16 +29,16 @@ namespace Chessour.Utilities
         }
         public static void PartialInsertionSort<T>(IList<T> buffer, int start, int end) where T : IArithmeticComparable<T>
         {
-            for (int i = 1; i < end; i++)
+            for (int i = start + 1; i < end; i++)
             {
-                T value = buffer[i];
+                T key = buffer[i];
                 int j = i - 1;
-                while (j >= start && buffer[j] < value)
+                for (; j >= start && buffer[j] < key; j--)
                 {
                     buffer[j + 1] = buffer[j];
-                    j--;
                 }
-                buffer[j + 1] = value;
+
+                buffer[j + 1] = key;
             }
         }
     }

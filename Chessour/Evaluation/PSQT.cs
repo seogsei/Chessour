@@ -1,4 +1,4 @@
-﻿using static Chessour.Evaluation;
+﻿using Chessour.Evaluation;
 
 namespace Chessour
 {
@@ -88,21 +88,19 @@ namespace Chessour
             },
         };
         private static readonly Score[,] psqt = new Score[(int)Piece.NB, (int)Square.NB];
-
-
         static PSQT()
         {
-            Span<Piece> pieces = stackalloc Piece[] 
+            Span<Piece> pieces = stackalloc Piece[]
                 { Piece.WhitePawn, Piece.WhiteKnight, Piece.WhiteBishop, Piece.WhiteRook, Piece.WhiteQueen, Piece.WhiteKing };
 
             foreach (Piece pc in pieces)
             {
-                Score pieceScore = new(PieceValue(GamePhase.MidGame, pc), PieceValue(GamePhase.EndGame, pc));
+                Score pieceScore = Pieces.PieceScore(pc);
 
                 for (Square s = Square.a1; s <= Square.h8; s++)
                 {
-                    psqt[(int)pc, (int)s] = pieceScore + (pc.GetPieceType() == PieceType.Pawn ? bonuses[(int)pc][(int)s.GetRank()][(int)s.GetFile()]
-                                                                                                   : bonuses[(int)pc][(int)s.GetRank()][s.GetFile().EdgeDistance()]);;
+                    psqt[(int)pc, (int)s] = pieceScore + (pc.TypeOf() == PieceType.Pawn ? bonuses[(int)pc][(int)s.GetRank()][(int)s.GetFile()]
+                                                                                         : bonuses[(int)pc][(int)s.GetRank()][s.GetFile().EdgeDistance()]); ;
 
                     psqt[(int)pc.Flip(), (int)s.FlipRank()] = -psqt[(int)pc, (int)s];
 
@@ -110,7 +108,7 @@ namespace Chessour
             }
         }
 
-        public static Score Get(Piece pc, Square s)
+        public static Score GetScore(Piece pc, Square s)
         {
             return psqt[(int)pc, (int)s];
         }

@@ -1,15 +1,15 @@
 ﻿namespace Chessour.Utilities
 {
-    internal ref struct StringReader
+    internal ref struct UCIStream
     {
         private readonly ReadOnlySpan<char> str;
         private int position;
 
-        public StringReader(string str) : this(str.AsSpan())
+        public UCIStream(string str) : this(str.AsSpan())
         {
             
         }
-        public StringReader(ReadOnlySpan<char> str)
+        public UCIStream(ReadOnlySpan<char> str)
         {
             this.str = str;
             position = 0;
@@ -31,12 +31,9 @@
         {
             return int.TryParse(NextToken(), out result);
         }
-
-        public bool Extract(out Depth result)
+        public bool Extract(out long result)
         {
-            bool r = Extract(out int r2);
-            result = (Depth)r2;
-            return r;
+            return long.TryParse(NextToken(), out result);
         }
 
         public bool Extract(out char result)
