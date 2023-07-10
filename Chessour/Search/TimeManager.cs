@@ -26,7 +26,7 @@ internal class TimeManager
         long flatTime = us == Color.White ? limits.whiteTime : limits.blackTime;
         long increment = us == Color.White ? limits.whiteIncrement : limits.blackIncrement;
 
-        long timeLeft = Math.Max(1, flatTime + increment * (movesToGo - 1));
+        long timeLeft = Math.Max(1, flatTime + (increment * (movesToGo - 1)));
 
         OptimumTime = (long)(timeLeft * optScale);
         MaxTime = (long)(timeLeft * maxScale);

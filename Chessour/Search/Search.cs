@@ -1,5 +1,4 @@
 ﻿using Chessour.Evaluation;
-using Chessour.MoveGeneration;
 using static Chessour.Engine;
 using static Chessour.Evaluation.ValueConstants;
 using static Chessour.Search.DepthConstants;
@@ -8,8 +7,8 @@ namespace Chessour.Search;
 
 internal partial class SearchThread
 {
-    public Depth CompletedDepth { get; protected set; }
-    public Depth SelectiveDepth { get; protected set; }
+    public int CompletedDepth { get; protected set; }
+    public int SelectiveDepth { get; protected set; }
     public ulong NodeCount { get; protected set; }
     public bool Searching { get; protected set; }
 
@@ -24,48 +23,52 @@ internal partial class SearchThread
         rootMoves.Clear();
 
         this.position.Set(position, rootState);
+        var moves = MoveGenerator.Generate(position, stackalloc MoveScore[256]);
 
-        MoveList moves = new(this.position, (stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]));
         foreach (Move m in moves)
             rootMoves.Add(new RootMove(m));
     }
 
-    protected ulong Perft(int depth, int ply = 0)
+    public ulong Perft(int depth)
     {
-        ulong branchNodes, nodes = 0;
+        return Perft(depth, 0);
 
-        var state = states[ply];
-
-        foreach (Move m in new MoveList(position, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]))
+        ulong Perft(int depth, int distanceToRoot)
         {
-            if (ply == 0 && depth <= 1)
-                nodes += branchNodes = 1;
+            var state = states[distanceToRoot];
+            bool leaf = depth == 2;
 
-            else
+            ulong branchNodes, totalNodes = 0;
+            foreach (Move move in MoveGenerator.Generate(position, stackalloc MoveScore[256]))
             {
-                position.MakeMove(m, state);
+                if (distanceToRoot == 0 && depth == 1)
+                    totalNodes += branchNodes = 1;
 
-                nodes += branchNodes = depth == 2 ? (ulong)new MoveList(position, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]).Count
-                                                  : Perft(depth - 1, ply + 1);
+                else
+                {
+                    position.MakeMove(move, state);
+                    branchNodes = leaf ? (ulong)MoveGenerator.Generate(position, stackalloc MoveScore[256]).Length
+                                       : Perft(depth - 1, distanceToRoot + 1);
+                    totalNodes += branchNodes;
+                    position.Takeback(move);
+                }
 
-                position.Takeback(m);
+                if (distanceToRoot == 0)
+                    Console.WriteLine($"{UCI.ToLongAlgebraic(move)}: {branchNodes}");
             }
 
-            if (ply == 0)
-                Console.WriteLine($"{m}: {branchNodes}");
+            return totalNodes;
         }
-
-        return nodes;
     }
 
     protected void Search()
-    {       
-        Depth rootDepth = 0;
+    {
+        int rootDepth = 0;
 
-        Value bestValue = -Value_INF;
-        Value alpha = -Value_INF;
-        Value delta = -Value_INF;
-        Value beta = Value_INF;
+        int bestValue = -Infinite;
+        int alpha = -Infinite;
+        int delta = -Infinite;
+        int beta = Infinite;
 
         Span<SearchStack> stacks = stackalloc SearchStack[MAX_PLY];
 
@@ -88,21 +91,21 @@ internal partial class SearchThread
                 if (Stop)
                     break;
 
-                if (this as MasterThread != null
+                if ((this as MasterThread) != null
                     && (bestValue <= alpha || bestValue >= beta)
-                    && Time.Elapsed > 3000)
-                    Console.WriteLine(UCI.PV(this, rootDepth));
+                    && Engine.TimeManager.Elapsed > 3000)
+                    Console.WriteLine(UCI.ParsePV(this, rootDepth));
 
                 if (bestValue <= alpha) //fail low
                 {
                     beta = (alpha + beta) / 2;
-                    alpha = Math.Max(bestValue - delta, -Value_INF);
+                    alpha = Math.Max(bestValue - delta, -Infinite);
 
                     failHighCount = 0;
                 }
                 else if (bestValue >= beta) //fail high
                 {
-                    beta = Math.Min(bestValue + delta, Value_INF);
+                    beta = Math.Min(bestValue + delta, Infinite);
                     failHighCount++;
                 }
                 else
@@ -110,59 +113,59 @@ internal partial class SearchThread
 
                 delta += delta / 4;
 
-                Debug.Assert(alpha >= -Value_INF && beta <= Value_INF);
+                Debug.Assert(alpha >= -Infinite && beta <= Infinite);
             }
 
-            if (this as MasterThread != null
-                && (!Stop || Time.Elapsed > 3000))
-                Console.WriteLine(UCI.PV(this, rootDepth));                    
+            if ((this as MasterThread) != null
+                && (!Stop || Engine.TimeManager.Elapsed > 3000))
+                Console.WriteLine(UCI.ParsePV(this, rootDepth));
 
             if (!Stop)
                 CompletedDepth = rootDepth;
 
             if (SearchLimits.mate > 0
-                && bestValue >= Value_Mate
-                && Value_Mate- bestValue >= 2 * SearchLimits.mate)
+                && bestValue >= Mate
+                && Mate - bestValue >= 2 * SearchLimits.mate)
                 Stop = true;
 
             if (SearchLimits.UseTimeManagement()
                 && !Stop)
             {
-                if (Time.Elapsed > Time.OptimumTime)
+                if (Engine.TimeManager.Elapsed > Engine.TimeManager.OptimumTime)
                     Stop = true;
             }
 
-            Debug.Assert(alpha >= -Value_INF && beta <= Value_INF);
+            Debug.Assert(alpha >= -Infinite && beta <= Infinite);
         }
     }
 
-    private Value Search(NodeType nodeType, Span<SearchStack> ss, Value alpha, Value beta, int ply, Depth depth, Span<Move> pv = default)
+    private int Search(NodeType nodeType, Span<SearchStack> ss, int alphaValue, int betaValue, int distanceToRoot, int depth, Span<Move> pv = default)
     {
         bool root = nodeType == NodeType.Root;
         bool pvNode = nodeType != NodeType.NonPV;
 
         if (depth <= 0)
-            return QSearch(nodeType, ss, alpha, beta, ply, pv);
+            return QSearch(nodeType, ss, alphaValue, betaValue, distanceToRoot, pv);
 
         NodeCount++;
 
 
         if (!root && position.IsDraw())
-            return Value_Draw;
+            return Draw;
 
 
-        Debug.Assert(-Value_INF <= alpha && alpha < beta && beta <= Value_INF);
-        Debug.Assert(pvNode || (alpha == beta - 1));
+        Debug.Assert(-Infinite <= alphaValue && alphaValue < betaValue && betaValue <= Infinite);
+        Debug.Assert(pvNode || (alphaValue == betaValue - 1));
         Debug.Assert(depth > 0 && depth < MAX_PLY);
 
         Span<Move> childPv = stackalloc Move[MAX_PLY];
-        Position.StateInfo state = states[ply];
+        Position.StateInfo state = states[distanceToRoot];
 
-        ref SearchStack stack = ref ss[ply];
+        ref SearchStack stack = ref ss[distanceToRoot];
 
-        Value value = -Value_INF;
-        Value bestValue = -Value_INF;
-        Value evaluation = -Value_INF;
+        int value = -Infinite;
+        int bestValue = -Infinite;
+        int evaluation = -Infinite;
         Move bestMove = Move.None;
         int moveCount = 0;
 
@@ -170,22 +173,22 @@ internal partial class SearchThread
 
         CheckTime();
 
-        if (pvNode && SelectiveDepth < ply + 1)
-            SelectiveDepth = ply + 1;
+        if (pvNode && SelectiveDepth < distanceToRoot + 1)
+            SelectiveDepth = distanceToRoot + 1;
 
         if (!root)
         {
             if (Stop)
                 return 0;
 
-            if (ply >= MAX_PLY)
-                return ss[ply].inCheck ? Value_Draw : Evaluator.Evaluate(position);
+            if (distanceToRoot >= MAX_PLY)
+                return ss[distanceToRoot].inCheck ? Draw : Evaluator.Evaluate(position);
 
             //Mate distance pruning
-            alpha = Math.Max(MatedIn(ply), alpha);
-            beta = Math.Min(MateIn(ply + 1), beta);
-            if (alpha >= beta)
-                return alpha;
+            alphaValue = Math.Max(MatedIn(distanceToRoot), alphaValue);
+            betaValue = Math.Min(MateIn(distanceToRoot + 1), betaValue);
+            if (alphaValue >= betaValue)
+                return alphaValue;
         }
 
 
@@ -193,7 +196,7 @@ internal partial class SearchThread
         Key positionKey = position.ZobristKey;
 
         ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTT(positionKey, out stack.ttHit);
-        Value ttValue = stack.ttHit ? ttentry.Evaluation : 0;
+        int ttValue = stack.ttHit ? ttentry.Evaluation : 0;
         Move ttMove = root ? rootMoves[0].pv[0]
                             : stack.ttHit ? ttentry.Move
                                             : Move.None;
@@ -201,12 +204,12 @@ internal partial class SearchThread
 
         if (stack.inCheck)
         {
-            evaluation = stack.staticEval = -Value_INF;
+            evaluation = stack.staticEval = -Infinite;
             goto movesloop;
         }
         else if (stack.ttHit)
         {
-            evaluation = stack.staticEval = ttentry.Evaluation;          
+            evaluation = stack.staticEval = ttentry.Evaluation;
         }
         else
         {
@@ -216,30 +219,30 @@ internal partial class SearchThread
         //Static null move
         if (depth < 5
             && !pvNode
-            && evaluation >= beta
-            && evaluation < KnownWin + 1)
+            && evaluation >= betaValue
+            && evaluation < ExpectedWin + 1)
             return evaluation;
 
         //Null move search
-        if(!pvNode
-            && ss[ply - 1].currentMove != Move.Null
+        if (!pvNode
+            && ss[distanceToRoot - 1].currentMove != Move.Null
             && depth > 2
-            && evaluation >= beta)
+            && evaluation >= betaValue)
         {
-            Depth reduction = 2;
-            if (depth > 6) 
+            int reduction = 2;
+            if (depth > 6)
                 reduction++;
-            
-            ss[ply].currentMove = Move.Null;
+
+            ss[distanceToRoot].currentMove = Move.Null;
 
             position.MakeNullMove(state);
-            Value nullValue = -Search(NodeType.NonPV, ss, -(alpha + 1), -alpha, ply + 1, depth - reduction - 1, pv);
+            int nullValue = -Search(NodeType.NonPV, ss, -(alphaValue + 1), -alphaValue, distanceToRoot + 1, depth - reduction - 1, pv);
             position.TakebackNullMove();
 
             if (Stop)
                 return 0;
 
-            if(nullValue >= beta)
+            if (nullValue >= betaValue)
             {
                 return nullValue;
             }
@@ -257,27 +260,27 @@ internal partial class SearchThread
                 continue;
 
             moveCount++;
-            ss[ply].currentMove = move;
+            ss[distanceToRoot].currentMove = move;
             bool givesCheck = position.GivesCheck(move);
 
             if (pvNode)
                 childPv[0] = Move.None;
 
-            position.MakeMove(move, states[ply], givesCheck);
+            position.MakeMove(move, states[distanceToRoot], givesCheck);
 
             if (!pvNode || moveCount > 1)
             {
-                value = -Search(NodeType.NonPV, ss, -(alpha + 1), -alpha, ply + 1, depth - 1);
+                value = -Search(NodeType.NonPV, ss, -(alphaValue + 1), -alphaValue, distanceToRoot + 1, depth - 1);
             }
 
             if (pvNode
                 && (moveCount == 1
-                || value > alpha
-                    && (root || value < beta)))
+                || (value > alphaValue
+                    && (root || value < betaValue))))
             {
                 childPv[0] = Move.None;
 
-                value = -Search(NodeType.PV, ss, -beta, -alpha, ply + 1, depth - 1, childPv);
+                value = -Search(NodeType.PV, ss, -betaValue, -alphaValue, distanceToRoot + 1, depth - 1, childPv);
             }
 
             position.Takeback(move);
@@ -285,48 +288,48 @@ internal partial class SearchThread
             if (Stop)
                 return 0;
 
-            Debug.Assert(value > -Value_INF && value < Value_INF);
+            Debug.Assert(value > -Infinite && value < Infinite);
 
             if (root)
             {
                 RootMove rm = rootMoves.Find(move)!;
 
-                if (moveCount == 1 || value > alpha)
+                if (moveCount == 1 || value > alphaValue)
                 {
                     rm.Score = rm.UCIScore = value;
                     rm.SelectiveDepth = SelectiveDepth;
 
                     rm.BoundLower = rm.BoundUpper = false;
 
-                    if (value >= beta)
+                    if (value >= betaValue)
                     {
                         rm.BoundLower = true;
-                        rm.UCIScore = beta;
+                        rm.UCIScore = betaValue;
                     }
-                    else if (value <= alpha)
+                    else if (value <= alphaValue)
                     {
                         rm.BoundUpper = true;
-                        rm.UCIScore = alpha;
+                        rm.UCIScore = alphaValue;
                     }
-                    
+
                     rm.pv.Clear();
                     rm.pv.Add(move);
-                    foreach(Move m in childPv)
+                    foreach (Move m in childPv)
                     {
                         if (m == Move.None) break;
 
                         rm.pv.Add(m);
-                    }                   
+                    }
                 }
                 else
-                    rm.Score = -Value_INF;
+                    rm.Score = -Infinite;
             }
 
             if (value > bestValue)
             {
                 bestValue = value;
 
-                if (value > alpha)
+                if (value > alphaValue)
                 {
                     bestMove = move;
 
@@ -335,21 +338,21 @@ internal partial class SearchThread
                         UpdatePV(pv, move, childPv);
                     }
 
-                    if (pvNode && value < beta)
+                    if (pvNode && value < betaValue)
                     {
-                        alpha = value;
-                   
+                        alphaValue = value;
+
                         if (depth > 1
                         && depth < 6
-                        && beta < KnownWin
-                        && alpha > -KnownWin)
+                        && betaValue < ExpectedWin
+                        && alphaValue > -ExpectedWin)
                             depth -= 1;
 
                         Debug.Assert(depth > 0);
                     }
                     else
                     {
-                        Debug.Assert(value >= beta);
+                        Debug.Assert(value >= betaValue);
                         break;
                     }
                 }
@@ -358,95 +361,95 @@ internal partial class SearchThread
 
         if (moveCount == 0)
         {
-            bestValue = stack.inCheck ? MatedIn(ply)
-                                         : Value_Draw;
+            bestValue = stack.inCheck ? MatedIn(distanceToRoot)
+                                         : Draw;
         }
 
         ttentry.Save(positionKey, pvNode, bestMove, depth,
-            bestValue >= beta ? Bound.Lower
+            bestValue >= betaValue ? Bound.Lower
                              : pvNode && bestMove != Move.None ? Bound.Exact
                                                                : Bound.Upper, bestValue);
 
         return bestValue;
     }
 
-    private Value QSearch(NodeType nodeType, Span<SearchStack> ss, Value alpha, Value beta, int ply, Span<Move> pv, Depth depth = 0)
+    private int QSearch(NodeType nodeType, Span<SearchStack> ss, int alphaValue, int betaValue, int distanceToRoot, Span<Move> pv, int depth = 0)
     {
         bool pvNode = nodeType != NodeType.NonPV;
         NodeCount++;
 
         if (position.IsDraw())
-            return Value_Draw;
+            return Draw;
 
         Debug.Assert(nodeType != NodeType.Root); // We shouldn be entering qSearch at root node
-        Debug.Assert(alpha >= -Value_INF && alpha < beta && beta <= Value_INF); //Value is not outside the defined bounds
-        Debug.Assert(pvNode || alpha == beta - 1); //This is a pv node or we are in a aspiration search
+        Debug.Assert(alphaValue >= -Infinite && alphaValue < betaValue && betaValue <= Infinite); //Value is not outside the defined bounds
+        Debug.Assert(pvNode || alphaValue == betaValue - 1); //This is a pv node or we are in a aspiration search
         Debug.Assert(depth <= 0 && depth > DepthConstants.TTOffset); //Depth is negative
 
         Span<Move> childPV = stackalloc Move[MAX_PLY];
-        Position.StateInfo state = states[ply];
+        Position.StateInfo state = states[distanceToRoot];
 
-        Value bestValue = -Value_INF;
+        int bestValue = -Infinite;
         Move bestMove = Move.None;
         int moveCount = 0;
 
-        ss[ply].inCheck = position.IsCheck();
+        ss[distanceToRoot].inCheck = position.IsCheck();
 
         CheckTime();
 
         if (pvNode)
             pv[0] = Move.None;
 
-        if (ply >= MAX_PLY)
-            return ss[ply].inCheck ? Value_Draw : Evaluator.Evaluate(position);
+        if (distanceToRoot >= MAX_PLY)
+            return ss[distanceToRoot].inCheck ? Draw : Evaluator.Evaluate(position);
 
-        Depth ttDepth = ss[ply].inCheck || depth >= DepthConstants.QSChecks ? DepthConstants.QSChecks
-                                                                            : DepthConstants.QSNoChecks;
+        int ttDepth = ss[distanceToRoot].inCheck || depth >= DepthConstants.QSChecks ? DepthConstants.QSChecks
+                                                                          : DepthConstants.QSNoChecks;
 
         //Transposition table lookup
         Key positionKey = position.ZobristKey;
-        ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTT(positionKey, out ss[ply].ttHit);
-        Value ttValue = ss[ply].ttHit ? ttentry.Evaluation : 0;
-        Move ttMove = ss[ply].ttHit ? ttentry.Move
+        ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTT(positionKey, out ss[distanceToRoot].ttHit);
+            int ttValue = ss[distanceToRoot].ttHit ? ttentry.Evaluation : 0;
+        Move ttMove = ss[distanceToRoot].ttHit ? ttentry.Move
                                     : Move.None;
 
         if (!pvNode
-            && ss[ply].ttHit
+            && ss[distanceToRoot].ttHit
             && ttentry.Depth >= ttDepth
-            && (ttentry.BoundType & (ttValue >= beta ? Bound.Lower : Bound.Upper)) != 0)
+            && (ttentry.BoundType & (ttValue >= betaValue ? Bound.Lower : Bound.Upper)) != 0)
             return ttValue;
 
         //Static evaluation
-        if (ss[ply].inCheck)
+        if (ss[distanceToRoot].inCheck)
         {
-            ss[ply].staticEval = 0;
-            bestValue = -Value_INF;
+            ss[distanceToRoot].staticEval = 0;
+            bestValue = -Infinite;
         }
         else
         {
-            if (ss[ply].ttHit)
+            if (ss[distanceToRoot].ttHit)
             {
-                if ((ss[ply].staticEval = bestValue = ttentry.Evaluation) == 0)
-                    ss[ply].staticEval = bestValue = Evaluator.Evaluate(position);
+                if ((ss[distanceToRoot].staticEval = bestValue = ttentry.Evaluation) == 0)
+                    ss[distanceToRoot].staticEval = bestValue = Evaluator.Evaluate(position);
 
                 if (ttValue != 0
                     && (ttentry.BoundType & (ttValue > bestValue ? Bound.Lower : Bound.Upper)) != 0)
                     bestValue = ttValue;
             }
             else
-                ss[ply].staticEval = bestValue = Evaluator.Evaluate(position);
+                ss[distanceToRoot].staticEval = bestValue = Evaluator.Evaluate(position);
 
             //Stand pat
-            if (bestValue >= beta)
+            if (bestValue >= betaValue)
             {
-                if (!ss[ply].ttHit)
-                    ttentry.Save(positionKey, pvNode, Move.None, 0, Bound.Lower, ss[ply].staticEval);
+                if (!ss[distanceToRoot].ttHit)
+                    ttentry.Save(positionKey, pvNode, Move.None, 0, Bound.Lower, ss[distanceToRoot].staticEval);
 
                 return bestValue;
             }
 
-            if (pvNode && bestValue > alpha)
-                alpha = bestValue;
+            if (pvNode && bestValue > alphaValue)
+                alphaValue = bestValue;
         }
 
         MovePicker mp = new(position, ttMove, Square.a1, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
@@ -456,7 +459,7 @@ internal partial class SearchThread
                 continue;
 
             moveCount++;
-            ss[ply].currentMove = move;
+            ss[distanceToRoot].currentMove = move;
             bool givesCheck = position.GivesCheck(move);
 
             //If we are not in a desperate situation we can skip the moves that returns a negative Static Exchange Evaluation
@@ -464,30 +467,30 @@ internal partial class SearchThread
                 && !position.SeeGe(move))
                 continue;
 
-            position.MakeMove(move, states[ply], givesCheck);
+            position.MakeMove(move, states[distanceToRoot], givesCheck);
 
-            Value value = -QSearch(nodeType, ss, -beta, -alpha, ply + 1, childPV, Math.Max(depth - 1, -6));
+            int value = -QSearch(nodeType, ss, -betaValue, -alphaValue, distanceToRoot + 1, childPV, Math.Max(depth - 1, -6));
 
             position.Takeback(move);
 
             if (Stop)
                 return 0;
 
-            Debug.Assert(value > -Value_INF && value < Value_INF);
+            Debug.Assert(value > -Infinite && value < Infinite);
 
             if (value > bestValue)
             {
                 bestValue = value;
 
-                if (value > alpha)
+                if (value > alphaValue)
                 {
                     bestMove = move;
 
                     if (pvNode)
                         UpdatePV(pv, move, childPV);
 
-                    if (pvNode && value < beta)
-                        alpha = value;
+                    if (pvNode && value < betaValue)
+                        alphaValue = value;
 
                     else
                         break;   //Fail high                    
@@ -496,14 +499,14 @@ internal partial class SearchThread
         }
 
         //After searching every evasion move if we have found no legal moves and we are in check we are mated
-        if (ss[ply].inCheck && bestValue == -Value_INF)
+        if (ss[distanceToRoot].inCheck && bestValue == -Infinite)
         {
-            Debug.Assert(new MoveList(position, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]).Count == 0);
-            return MatedIn(ply);
+            Debug.Assert(MoveGenerator.Generate(position, stackalloc MoveScore[256]).Length == 0);
+            return MatedIn(distanceToRoot);
         }
 
         ttentry.Save(positionKey, pvNode, bestMove, ttDepth,
-            bestValue >= beta ? Bound.Lower
+            bestValue >= betaValue ? Bound.Lower
                              : pvNode && bestMove != Move.None ? Bound.Exact
                                                                 : Bound.Upper, bestValue);
 
@@ -512,13 +515,14 @@ internal partial class SearchThread
 
     private static void CheckTime()
     {
-        var elapsed = Time.Elapsed;
-        
-        if((SearchLimits.UseTimeManagement() && elapsed > Time.MaxTime))
+        var elapsed = Engine.TimeManager.Elapsed;
+
+        if (SearchLimits.UseTimeManagement() && elapsed > Engine.TimeManager.MaxTime)
         {
-            Stop = true; 
+            Stop = true;
         }
     }
+
     private static void UpdatePV(Span<Move> pv, Move move, Span<Move> childPv)
     {
         int i = 0, j = 0;
@@ -539,7 +543,7 @@ internal partial class SearchThread
     {
         public bool inCheck;
         public bool ttHit;
-        public Value staticEval;
+        public int staticEval;
         public Move currentMove;
     }
 }

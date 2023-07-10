@@ -1,7 +1,4 @@
-﻿using Chessour.Evaluation;
-using Chessour.MoveGeneration;
-
-namespace Chessour.Search;
+﻿namespace Chessour.Search;
 
 internal ref struct MovePicker
 {
@@ -44,7 +41,7 @@ internal ref struct MovePicker
 
     public Move NextMove()
     {
-    top:
+        top:
         switch (stage)
         {
             //Transposition tables
@@ -97,20 +94,12 @@ internal ref struct MovePicker
 
     public void Generate(GenerationType type)
     {
-        end = MoveGenerator.Generate(type, position, buffer, curent);
+        end = MoveGenerator.Generate(type, position, buffer[curent..]).Length;
     }
 
     public void Score(GenerationType type)
     {
-        for (int i = curent; i < end; i++)
-        {
-            MoveScore m = buffer[i];
-            if (type == GenerationType.Captures)
-            {
-                m.Score = Pieces.PieceScore(position.PieceAt(m.Move.To)).MidGame
-                        - Pieces.PieceScore(position.PieceAt(m.Move.From)).MidGame;
-            }
-        }
+
     }
 
     private Move FindNext()

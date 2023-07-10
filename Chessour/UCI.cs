@@ -1,60 +1,16 @@
 ﻿using Chessour.Evaluation;
-using Chessour.MoveGeneration;
 using Chessour.Search;
+using Chessour.Utilities;
 using System.Text;
+using static Chessour.BoardRepresentation;
 
 namespace Chessour;
 
-internal static class UCI
+public static class UCI
 {
-    public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";     
-    public const int NormalizeToPawn = Chessour.Evaluation.ValueConstants.PawnMGValue;
+    internal const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-    public static string PV(SearchThread bestThread, Depth depth)
-    {
-        StringBuilder sb = new(1024);
-
-        RootMoves rootMoves = bestThread.rootMoves;
-        ulong nodesSearched = Engine.Threads.NodesSearched;
-        var elapsed = Engine.Time.Elapsed + 1;
-
-        sb.Append("info");
-        sb.Append(" depth ");
-        sb.Append(depth);
-        sb.Append(" seldepth ");
-        sb.Append(rootMoves[0].SelectiveDepth);
-        sb.Append(" score ");
-        sb.Append(rootMoves[0].UCIScore.ToUCIString());
-
-        sb.Append(" nodes ");
-        sb.Append(nodesSearched);
-        sb.Append(" nps ");
-        sb.Append(nodesSearched * 1000 / (ulong)elapsed);
-        sb.Append(" time ");
-        sb.Append(elapsed);
-
-        sb.Append(" pv");
-        foreach (Move m in rootMoves[0].pv)
-        {
-            sb.Append(' ');
-            sb.Append(m);
-        }     
-
-        return sb.ToString();
-    }
-
-    public static Move ParseMove(Position position, string str)
-    {
-        MoveList moveList = new(position, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
-
-        foreach (Move m in moveList)
-            if (str == m.ToString())
-                return m;
-
-        return Move.None;
-    }
-
-    public static void Loop(string[] args)
+    internal static void Start(string[] args)
     {
         Position position = new(StartFEN, new());
 
@@ -107,6 +63,68 @@ internal static class UCI
             }
 
         } while (command != "quit" && args.Length == 0);
+    }
+
+    internal static string ParsePV(SearchThread bestThread, int depth)
+    {
+        StringBuilder sb = new(1024);
+
+        RootMoves rootMoves = bestThread.rootMoves;
+        ulong nodesSearched = Engine.Threads.NodesSearched;
+        var elapsed = Engine.TimeManager.Elapsed + 1;
+
+        sb.Append("info");
+        sb.Append(" depth ");
+        sb.Append(depth);
+        sb.Append(" seldepth ");
+        sb.Append(rootMoves[0].SelectiveDepth);
+        sb.Append(" score ");
+        sb.Append(ParseScore(rootMoves[0].UCIScore));
+
+        sb.Append(" nodes ");
+        sb.Append(nodesSearched);
+        sb.Append(" nps ");
+        sb.Append(nodesSearched * 1000 / (ulong)elapsed);
+        sb.Append(" time ");
+        sb.Append(elapsed);
+
+        sb.Append(" pv");
+        foreach (Move m in rootMoves[0].pv)
+        {
+            sb.Append(' ');
+            sb.Append(m);
+        }
+
+        return sb.ToString();
+    }
+
+    internal static string ParseScore(this int score)
+    {
+        if (Math.Abs(score) < ValueConstants.MateInMaxPly)
+        {
+            int cpScore = score * 100 / ValueConstants.PawnMidGame;
+
+            return $"cp {cpScore}";
+        }
+        else
+        {
+            int mateDistance = score > 0 ? ValueConstants.Mate - score + 1
+                                         : ValueConstants.Mated - score;
+
+            return $"mate {mateDistance / 2}";
+        }
+
+    }
+
+    internal static Move ParseMove(Position position, string str)
+    {
+        var moves = MoveGenerator.Generate(position, stackalloc MoveScore[256]);
+
+        foreach (Move m in moves)
+            if (str == ToLongAlgebraic(m))
+                return m;
+
+        return Move.None;
     }
 
     private static void Position(ref UCIStream ss, Position position)
@@ -227,5 +245,26 @@ internal static class UCI
                 Nodes searched : {nodes}
                 Nps : {1000 * nodes / (ulong)elapsed}
                 """);
+    }
+
+    public static string ToLongAlgebraic(this Move move)
+    {
+        if (move == Move.None)
+            return "(none)";
+
+        if (move == Move.Null)
+            return "0000";
+
+        Square from = move.From();
+        Square to = move.To();
+
+        if (move.Type() == MoveType.Castling)
+            to = MakeSquare(to > from ? File.g : File.c, from.GetRank());
+
+        string moveString = string.Concat(from, to);
+        if (move.Type() == MoveType.Promotion)
+            moveString += " pnbrqk"[(int)move.PromotionPiece()];
+
+        return moveString;
     }
 }

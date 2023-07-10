@@ -34,13 +34,13 @@ namespace Chessour.Evaluation
                             new(0, 0), new(0, 0), new(0, 0)  },
         };
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static double ToPawnValue(Value evaluation)
+
+        public static double ToPawnValue(int evaluation)
         {
-            return evaluation / (double)PawnMGValue;
+            return evaluation / (double)PawnMidGame;
         }
 
-        public static Value Evaluate(Position position, bool trace = false)
+        public static int Evaluate(Position position, bool trace = false)
         {
             Debug.Assert(!position.IsCheck());
 
@@ -56,20 +56,20 @@ namespace Chessour.Evaluation
                 Trace.Add(Trace.Term.Material, Color.White, position.PSQScore);
             }
 
-            Value v = TaperedEval(score, position, trace);
+            int v = TaperedEval(score, position, trace);
             return position.ActiveColor == Color.White ? v : -v;
         }
 
-        private static Value TaperedEval(Score score, Position position, bool trace)
+        private static int TaperedEval(Score score, Position position, bool trace)
         {
-            Value mg = score.MidGame;
-            Value eg = score.EndGame;
+            int mg = score.MidGame;
+            int eg = score.EndGame;
 
             Phase phase = position.Phase;
 
-            phase = (Phase)(((int)phase * 256 + (int)Phase.Total / 2) / (int)Phase.Total);
+            phase = (Phase)((((int)phase * 256) + ((int)Phase.Total / 2)) / (int)Phase.Total);
 
-            Value v = (eg * (256 - (int)phase) + mg * (int)phase) / 256;
+            int v = ((eg * (256 - (int)phase)) + (mg * (int)phase)) / 256;
 
             if (trace)
                 Trace.Add(Trace.Term.Total, Color.White, score);

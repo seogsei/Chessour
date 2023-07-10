@@ -7,7 +7,7 @@
 
         public UCIStream(string str) : this(str.AsSpan())
         {
-            
+
         }
         public UCIStream(ReadOnlySpan<char> str)
         {
@@ -17,7 +17,7 @@
 
         public void SkipWhiteSpace()
         {
-            while (position < str.Length && str[position] == ' ') position++; 
+            while (position < str.Length && str[position] == ' ') position++;
         }
 
         public bool Extract(out string result)
@@ -38,7 +38,7 @@
 
         public bool Extract(out char result)
         {
-            result = default;         
+            result = default;
             if (position >= str.Length - 1)
                 return false;
 
@@ -67,7 +67,7 @@
 
             int start = position;
 
-            while (position < str.Length && str[position] != ' ') position++; 
+            while (position < str.Length && str[position] != ' ') position++;
 
             return str[start..position++];
         }

@@ -18,7 +18,7 @@ internal partial class SearchThread
         position = new Position(UCI.StartFEN, rootState = new());
         rootMoves = new();
         states = new Position.StateInfo[MAX_PLY];
-        for(int i = 0; i< MAX_PLY; i++)
+        for (int i = 0; i < MAX_PLY; i++)
         {
             states[i] = new();
         }
@@ -27,6 +27,8 @@ internal partial class SearchThread
         Searching = true;
 
         thread = new Thread(IdleLoop);
+        thread.IsBackground = true;
+
         thread.Start();
         WaitForSearchFinish();
     }
@@ -39,25 +41,26 @@ internal partial class SearchThread
         Release();
         thread.Join();
     }
-   
+
     public void Release()
     {
+        Searching = true;
+
         lock (syncPrimitive)
         {
-            Searching = true;
             Monitor.Pulse(syncPrimitive);
         }
     }
-   
+
     public void WaitForSearchFinish()
     {
-        lock (syncPrimitive)
-        {
-            if(Searching)
+        if (Searching)
+            lock (syncPrimitive)
+            {
                 Monitor.Wait(syncPrimitive);
-        }
+            }
     }
-       
+
     protected virtual void StartSearch()
     {
         Search();
@@ -67,16 +70,16 @@ internal partial class SearchThread
     {
         while (true)
         {
+            Searching = false;
+
             lock (syncPrimitive)
             {
-                Searching = false;
-
                 Monitor.Pulse(syncPrimitive);
                 Monitor.Wait(syncPrimitive);
-
-                if (Exit)
-                    break;
             }
+
+            if (Exit)
+                break;
 
             StartSearch();
         }

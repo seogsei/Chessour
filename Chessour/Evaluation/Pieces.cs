@@ -7,11 +7,11 @@ namespace Chessour.Evaluation
         private static readonly Score[] pieceScores = new Score[(int)PieceType.NB]
         {
             Score.Zero,
-            new Score(PawnMGValue, PawnEGValue),
-            new Score(KnightMGValue, KnightEGValue),
-            new Score(BishopMGValue, BishopEGValue),
-            new Score(RookMGValue, RookEGValue),
-            new Score(QueenMGValue, QueenEGValue),
+            new Score(PawnMidGame, PawnEndGame),
+            new Score(KnightMidGame, KnightEndGame),
+            new Score(BishopMidGame, BishopEndGame),
+            new Score(RookMidGame, RookEndGame),
+            new Score(QueenMidGame, QueenEndGame),
             Score.Zero,
         };
         private static readonly Phase[] phaseScores = new Phase[(int)PieceType.NB];
@@ -21,6 +21,7 @@ namespace Chessour.Evaluation
         {
             return PieceScore(piece.TypeOf());
         }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Score PieceScore(this PieceType piece)
         {

@@ -9,7 +9,7 @@ internal sealed class ThreadPool : List<SearchThread>
     {
         SetSize(initialSize);
     }
-    
+
     public MasterThread Master
     {
         get
@@ -29,7 +29,7 @@ internal sealed class ThreadPool : List<SearchThread>
             return total;
         }
     }
-   
+
     public void WaitForSeachFinish()
     {
         Master.WaitForSearchFinish();

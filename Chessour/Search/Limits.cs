@@ -22,5 +22,5 @@ internal struct Limits
     public bool UseTimeManagement()
     {
         return whiteTime != default || blackTime != default;
-    }    
+    }
 }

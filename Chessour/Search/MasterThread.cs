@@ -7,6 +7,7 @@ internal class MasterThread : SearchThread
         if (Engine.SearchLimits.perft > 0)
         {
             NodeCount = Perft(Engine.SearchLimits.perft);
+            Console.WriteLine($"Nodes searched : {NodeCount}");
             return;
         }
 
@@ -25,10 +26,10 @@ internal class MasterThread : SearchThread
         //Find the best thread
         SearchThread bestThread = this;
 
-        Console.Write($"bestmove {bestThread.rootMoves[0].pv[0]}");
+        Console.Write($"bestmove {bestThread.rootMoves[0].pv[0].ToLongAlgebraic()}");
 
         if (bestThread.rootMoves[0].pv.Count > 1)
-            Console.Write($" ponder {bestThread.rootMoves[0].pv[1]}");
+            Console.Write($" ponder {bestThread.rootMoves[0].pv[1].ToLongAlgebraic()}");
 
         Console.WriteLine();
     }

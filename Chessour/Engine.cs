@@ -6,42 +6,59 @@ namespace Chessour
     {
         public const string Name = "Chessour";
         public const string Author = "Muhammed Ikbal Yaman";
-        private static readonly Stopwatch stopwatch;
 
         static Engine()
         {
             Stop = true;
 
-            stopwatch = new();
-            stopwatch.Start();
+            _timer = new();
+            _timer.Start();
 
-            Threads = new ThreadPool(1);
-            Time = new();
-            TTTable = new TranspositionTable();
+            _threads = new ThreadPool(1);
+            _timeManager = new();
+            _transpositionTable = new();
         }
+
+        private static readonly Stopwatch _timer;
+        private static readonly TimeManager _timeManager;
+        private static readonly TranspositionTable _transpositionTable;
+        private static readonly ThreadPool _threads;
+        private static Limits _limits;
+        private static bool _stop;
 
         public static long Now
         {
-            get
-            {
-                return stopwatch.ElapsedMilliseconds;
-            }
+            get => _timer.ElapsedMilliseconds;
         }
-
-
-        public static bool Stop { get; set; }
-        public static ThreadPool Threads { get; }
-        public static TranspositionTable TTTable { get; }
-        public static Limits SearchLimits { get; private set; }
-        public static TimeManager Time { get; }
+        public static bool Stop
+        {
+            get => _stop;
+            set => _stop = value;
+        }
+        public static ThreadPool Threads
+        {
+            get => _threads;
+        }
+        public static TranspositionTable TTTable
+        {
+            get => _transpositionTable;
+        }
+        public static Limits SearchLimits
+        {
+            get => _limits;
+        }
+        public static TimeManager TimeManager
+        {
+            get => _timeManager;
+        }
 
         public static void StartThinking(Position position, in Limits limits)
         {
-            Threads.Master.WaitForSearchFinish();
+            _threads.Master.WaitForSearchFinish();
 
             Stop = false;
-            SearchLimits = limits;
-            Time.Initialize(limits, position.ActiveColor, 0);
+            _limits = limits;
+            _timeManager.Initialize(limits, position.ActiveColor, 0);
 
             foreach (var th in Threads)
             {
@@ -49,7 +66,7 @@ namespace Chessour
                 th.ResetSearchStats();
             }
 
-            Threads.Master.Release();
+            _threads.Master.Release();
         }
     }
 }

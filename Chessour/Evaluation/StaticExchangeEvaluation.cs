@@ -6,13 +6,13 @@ namespace Chessour.Evaluation;
 
 internal static class StaticExchangeEvaluation
 {
-    public static bool SeeGe(this Position position, Move m, Value threshold = 0)
+    public static bool SeeGe(this Position position, Move m, int threshold = 0)
     {
-        if (m.Type != MoveType.Quiet)
+        if (m.Type() != MoveType.Quiet)
             return 0 >= threshold;
 
-        Square from = m.From;
-        Square to = m.To;
+        Square from = m.From();
+        Square to = m.To();
 
         int swap = Pieces.PieceScore(position.PieceAt(to)).MidGame - threshold;
 
@@ -51,7 +51,7 @@ internal static class StaticExchangeEvaluation
 
             if ((bb = sideAttackers & position.Pieces(Pawn)) != 0)
             {
-                if ((swap = PawnMGValue - swap) < result)
+                if ((swap = PawnMidGame - swap) < result)
                     break;
 
                 occupied ^= bb.LeastSignificantBit();
@@ -59,14 +59,14 @@ internal static class StaticExchangeEvaluation
             }
             else if ((bb = sideAttackers & position.Pieces(Knight)) != 0)
             {
-                if ((swap = KnightMGValue - swap) < result)
+                if ((swap = KnightMidGame - swap) < result)
                     break;
 
                 occupied ^= bb.LeastSignificantBit();
             }
             else if ((bb = sideAttackers & position.Pieces(Bishop)) != 0)
             {
-                if ((swap = BishopMGValue - swap) < result)
+                if ((swap = BishopMidGame - swap) < result)
                     break;
 
                 occupied ^= bb.LeastSignificantBit();
@@ -74,7 +74,7 @@ internal static class StaticExchangeEvaluation
             }
             else if ((bb = sideAttackers & position.Pieces(Rook)) != 0)
             {
-                if ((swap = RookMGValue - swap) < result)
+                if ((swap = RookMidGame - swap) < result)
                     break;
 
                 occupied ^= bb.LeastSignificantBit();
@@ -82,12 +82,12 @@ internal static class StaticExchangeEvaluation
             }
             else if ((bb = sideAttackers & position.Pieces(Queen)) != 0)
             {
-                if ((swap = QueenMGValue - swap) < result)
+                if ((swap = QueenMidGame - swap) < result)
                     break;
 
                 occupied ^= bb.LeastSignificantBit();
-                attackers |= BishopAttacks(to, occupied) & position.Pieces(Bishop, Queen)
-                          | RookAttacks(to, occupied) & position.Pieces(Rook, Queen);
+                attackers |= (BishopAttacks(to, occupied) & position.Pieces(Bishop, Queen))
+                          | (RookAttacks(to, occupied) & position.Pieces(Rook, Queen));
             }
             else
             {

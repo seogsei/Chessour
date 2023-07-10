@@ -6,8 +6,8 @@ public class RootMoves : List<RootMove>
 {
     public bool Contains(Move m)
     {
-        foreach (var rm in this) 
-            if (rm.Move == m) 
+        foreach (var rm in this)
+            if (rm.Move == m)
                 return true;
 
         return false;
@@ -18,12 +18,12 @@ public class RootMoves : List<RootMove>
         foreach (var item in this)
             if (item.Move == m)
                 return item;
-        
+
         return null;
     }
 
     public void Sort(int start = 0)
     {
-        Utility.PartialInsertionSort(this, start, Count);
+        Utilities.Utility.PartialInsertionSort(this, start, Count);
     }
 }
