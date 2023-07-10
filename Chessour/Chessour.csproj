@@ -6,5 +6,6 @@
         <Nullable>enable</Nullable>
         <Platforms>AnyCPU</Platforms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<OutDir>C:\Program Files (x86)\Arena\Engines\Chessour(Dev)</OutDir>
     </PropertyGroup>	
 </Project>
