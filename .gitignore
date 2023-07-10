@@ -362,3 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
 /ChessourTest/ChessourTest.csproj
+/ChessourTest/Usings.cs
+/ChessourTest/PerftTests.cs
+/ChessourTest/PerftTests.cs
+/ChessourTest/Usings.cs
