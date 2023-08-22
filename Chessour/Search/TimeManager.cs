@@ -6,12 +6,9 @@ internal class TimeManager
     public long OptimumTime { get; protected set; }
     public long MaxTime { get; protected set; }
 
-    public long Elapsed
+    public long Elapsed()
     {
-        get
-        {
-            return Engine.Now - StartTime;
-        }
+        return Engine.Now - StartTime;
     }
 
     public void Initialize(Limits limits, Color us, int ply)
@@ -19,12 +16,12 @@ internal class TimeManager
         double optScale = 0.005;
         double maxScale = 0.1;
 
-        StartTime = limits.startTime;
+        StartTime = limits.StartTime;
 
-        int movesToGo = limits.movesToGo != 0 ? Math.Min(limits.movesToGo, 50) : 50;
+        int movesToGo = limits.MovesToGo != 0 ? Math.Min(limits.MovesToGo, 50) : 50;
 
-        long flatTime = us == Color.White ? limits.whiteTime : limits.blackTime;
-        long increment = us == Color.White ? limits.whiteIncrement : limits.blackIncrement;
+        long flatTime = us == Color.White ? limits.WhiteTime : limits.BlackTime;
+        long increment = us == Color.White ? limits.WhiteIncrement : limits.BlackIncrement;
 
         long timeLeft = Math.Max(1, flatTime + (increment * (movesToGo - 1)));
 

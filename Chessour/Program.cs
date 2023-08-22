@@ -1,7 +1,15 @@
-﻿namespace Chessour
+﻿using System.Runtime.CompilerServices;
+
+namespace Chessour
 {
     internal class Program
     {
-        public static void Main(string[] args) => UCI.Start(args);
+        public static void Main(string[] args)
+        {
+            
+
+            UCI uci = new();
+            uci.Run(args);
+        }
     }
 }

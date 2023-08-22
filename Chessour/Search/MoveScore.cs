@@ -1,4 +1,5 @@
-﻿using System.Runtime.InteropServices;
+﻿using System.Numerics;
+using System.Runtime.InteropServices;
 
 namespace Chessour.Search
 {
@@ -17,27 +18,15 @@ namespace Chessour.Search
             Score = score;
         }
 
-        public Move Move { get; }
-        public short Score { get; set; }
+        public readonly Move Move { get; }
+        public int Score { get; set; }
 
-        public static implicit operator MoveScore(Move m)
-        {
-            return new(m);
-        }
+        public static bool operator <(MoveScore left, MoveScore right) => left.Score < right.Score;
+        public static bool operator >(MoveScore left, MoveScore right) => left.Score > right.Score;
+        public static bool operator <=(MoveScore left, MoveScore right) => left.Score <= right.Score;
+        public static bool operator >=(MoveScore left, MoveScore right) => left.Score >= right.Score;
 
-        public static implicit operator Move(MoveScore m)
-        {
-            return m.Move;
-        }
-
-        public static bool operator <(MoveScore lhs, MoveScore rhs)
-        {
-            return lhs.Score < rhs.Score;
-        }
-
-        public static bool operator >(MoveScore lhs, MoveScore rhs)
-        {
-            return lhs.Score > rhs.Score;
-        }
+        public static implicit operator MoveScore(Move move) => new(move);
+        public static implicit operator Move(MoveScore moveScore) => moveScore.Move;
     }
 }

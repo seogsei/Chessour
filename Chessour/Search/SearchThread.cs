@@ -5,49 +5,52 @@ namespace Chessour.Search;
 
 internal partial class SearchThread
 {
-    public readonly RootMoves rootMoves;
+    public SearchThread()
+    {
+        states = new Position.StateInfo[MAX_PLY];
+        for (int i = 0; i < MAX_PLY; i++)
+            states[i] = new();
+
+        position = new Position(UCI.StartFEN, rootState = new());
+
+        rootMoves = new();
+
+        syncPrimitive = new();
+       
+        Searching = true;
+        thread = new(Loop)
+        {
+            IsBackground = true
+        };
+        thread.Start();
+
+        WaitForSearchFinish();
+    }
+
     private readonly Thread thread;
     private readonly object syncPrimitive;
+    private bool abort;
 
     private readonly Position position;
     private readonly Position.StateInfo rootState;
     private readonly Position.StateInfo[] states;
 
-    public SearchThread()
-    {
-        position = new Position(UCI.StartFEN, rootState = new());
-        rootMoves = new();
-        states = new Position.StateInfo[MAX_PLY];
-        for (int i = 0; i < MAX_PLY; i++)
-        {
-            states[i] = new();
-        }
-
-        syncPrimitive = new();
-        Searching = true;
-
-        thread = new Thread(IdleLoop);
-        thread.IsBackground = true;
-
-        thread.Start();
-        WaitForSearchFinish();
-    }
-
-    public bool Exit { get; set; }
+    public static bool Stop { get; set; } = true;
 
     public void Abort()
     {
-        Exit = true;
+        Debug.Assert(!Searching);
+
+        abort = true;
         Release();
         thread.Join();
     }
 
     public void Release()
     {
-        Searching = true;
-
         lock (syncPrimitive)
         {
+            Searching = true;
             Monitor.Pulse(syncPrimitive);
         }
     }
@@ -55,18 +58,20 @@ internal partial class SearchThread
     public void WaitForSearchFinish()
     {
         if (Searching)
+        {
             lock (syncPrimitive)
             {
                 Monitor.Wait(syncPrimitive);
             }
+        }
     }
 
-    protected virtual void StartSearch()
+    public virtual void Work()
     {
         Search();
     }
 
-    private void IdleLoop()
+    private void Loop()
     {
         while (true)
         {
@@ -74,14 +79,17 @@ internal partial class SearchThread
 
             lock (syncPrimitive)
             {
+                //Awaken the main thread waiting for the search to finish
                 Monitor.Pulse(syncPrimitive);
+
+                //Go to sleep until a search is started
                 Monitor.Wait(syncPrimitive);
+
+                if (abort)
+                    return;
             }
 
-            if (Exit)
-                break;
-
-            StartSearch();
+            Work();
         }
     }
 }

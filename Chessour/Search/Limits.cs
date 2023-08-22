@@ -1,26 +1,31 @@
 ﻿using System.Collections.Generic;
 
-namespace Chessour.Search;
-
-internal struct Limits
+namespace Chessour.Search 
 {
-    public List<Move>? searchMoves;
-
-    public long startTime, whiteTime, blackTime, whiteIncrement, blackIncrement, moveTime;
-    public int movesToGo, mate, depth, perft;
-    public long nodes;
-    public bool infinite;
-
-    public Limits()
+    internal sealed class Limits
     {
-        startTime = whiteTime = blackTime = whiteIncrement = blackIncrement = moveTime = 0;
-        movesToGo = mate = depth = perft = 0;
-        nodes = 0;
-        infinite = false;
-    }
+        public int Perft;
 
-    public bool UseTimeManagement()
-    {
-        return whiteTime != default || blackTime != default;
+        public List<Move> Moves = new();
+        public long StartTime;
+        public long WhiteTime;
+
+        public long BlackTime;
+        public long WhiteIncrement;
+        public long BlackIncrement;
+        public long MoveTime;
+        public int MovesToGo;
+
+        public int Mate;
+        public int Depth;
+        public long Nodes;
+
+        public bool Infinite;
+
+        public bool UseTimeManagement()
+        {
+            return WhiteTime != 0 || BlackTime != 0;
+        }
     }
 }
+

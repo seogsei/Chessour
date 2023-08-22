@@ -2,11 +2,11 @@
 
 internal class MasterThread : SearchThread
 {
-    protected override void StartSearch()
+    public override void Work()
     {
-        if (Engine.SearchLimits.perft > 0)
+        if (Engine.SearchLimits.Perft > 0)
         {
-            NodeCount = Perft(Engine.SearchLimits.perft);
+            NodeCount = Perft(Engine.SearchLimits.Perft);
             Console.WriteLine($"Nodes searched : {NodeCount}");
             return;
         }
@@ -26,10 +26,10 @@ internal class MasterThread : SearchThread
         //Find the best thread
         SearchThread bestThread = this;
 
-        Console.Write($"bestmove {bestThread.rootMoves[0].pv[0].ToLongAlgebraic()}");
+        Console.Write($"bestmove {UCI.Move(bestThread.rootMoves[0].Move)}");
 
-        if (bestThread.rootMoves[0].pv.Count > 1)
-            Console.Write($" ponder {bestThread.rootMoves[0].pv[1].ToLongAlgebraic()}");
+        if (bestThread.rootMoves[0].PV.Count > 1)
+            Console.Write($" ponder {UCI.Move(bestThread.rootMoves[0].Refutation)}");
 
         Console.WriteLine();
     }

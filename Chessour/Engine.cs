@@ -9,64 +9,33 @@ namespace Chessour
 
         static Engine()
         {
-            Stop = true;
-
-            _timer = new();
-            _timer.Start();
-
-            _threads = new ThreadPool(1);
-            _timeManager = new();
-            _transpositionTable = new();
+            timer.Start();
         }
 
-        private static readonly Stopwatch _timer;
-        private static readonly TimeManager _timeManager;
-        private static readonly TranspositionTable _transpositionTable;
-        private static readonly ThreadPool _threads;
-        private static Limits _limits;
-        private static bool _stop;
+        private static readonly Stopwatch timer = new();
 
-        public static long Now
-        {
-            get => _timer.ElapsedMilliseconds;
-        }
-        public static bool Stop
-        {
-            get => _stop;
-            set => _stop = value;
-        }
-        public static ThreadPool Threads
-        {
-            get => _threads;
-        }
-        public static TranspositionTable TTTable
-        {
-            get => _transpositionTable;
-        }
-        public static Limits SearchLimits
-        {
-            get => _limits;
-        }
-        public static TimeManager TimeManager
-        {
-            get => _timeManager;
-        }
+        public static ThreadPool Threads { get; private set; } = new (1);
+        public static TranspositionTable TTTable { get; private set; } = new();
+        public static TimeManager TimeManager { get; private set; } = new();
+        public static Limits SearchLimits { get; private set; }
+        public static long Now => timer.ElapsedMilliseconds;
 
         public static void StartThinking(Position position, in Limits limits)
         {
-            _threads.Master.WaitForSearchFinish();
+            Threads.Master.WaitForSearchFinish();
 
-            Stop = false;
-            _limits = limits;
-            _timeManager.Initialize(limits, position.ActiveColor, 0);
+            SearchLimits = limits;
+            TimeManager.Initialize(limits, position.ActiveColor, 0);
 
             foreach (var th in Threads)
             {
-                th.SetPosition(position);
+                th.SetPosition(position, limits.Moves);
                 th.ResetSearchStats();
             }
 
-            _threads.Master.Release();
+            SearchThread.Stop = false;
+
+            Threads.Master.Release();
         }
     }
 }

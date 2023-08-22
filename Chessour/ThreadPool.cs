@@ -1,26 +1,19 @@
 ﻿using Chessour.Search;
 using System.Collections.Generic;
 
-namespace Chessour;
-
-internal sealed class ThreadPool : List<SearchThread>
+namespace Chessour
 {
-    public ThreadPool(int initialSize)
-    {
-        SetSize(initialSize);
-    }
 
-    public MasterThread Master
+    internal sealed class ThreadPool : List<SearchThread>
     {
-        get
+        public ThreadPool(int initialSize)
         {
-            return (MasterThread)this[0];
+            SetSize(initialSize);
         }
-    }
 
-    public ulong NodesSearched
-    {
-        get
+        public MasterThread Master => (MasterThread)this[0];
+
+        public ulong TotalNodesSearched()
         {
             ulong total = 0;
             foreach (var thread in this)
@@ -28,32 +21,34 @@ internal sealed class ThreadPool : List<SearchThread>
 
             return total;
         }
-    }
 
-    public void WaitForSeachFinish()
-    {
-        Master.WaitForSearchFinish();
-    }
-
-    public void SetSize(int expected)
-    {
-        while (Count > 0)
+        public void WaitForSeachFinish()
         {
-            WaitForSeachFinish();
-
-            while (Count > 0)
-            {
-                this[Count - 1].Abort();
-                RemoveAt(Count - 1);
-            }
+            Master.WaitForSearchFinish();
         }
 
-        if (expected > 0)
+        public void SetSize(int expected)
         {
-            Add(new MasterThread());
+            //Remove every thread
+            while (Count > 0)
+            {
+                WaitForSeachFinish();
 
-            while (Count < expected)
-                Add(new SearchThread());
+                while (Count > 0)
+                {
+                    this[Count - 1].Abort();
+                    RemoveAt(Count - 1);
+                }
+            }
+
+            //Add as many threads as wanted
+            if (expected > 0)
+            {
+                Add(new MasterThread());
+
+                while (Count < expected)
+                    Add(new SearchThread());
+            }
         }
     }
 }

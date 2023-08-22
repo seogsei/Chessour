@@ -1,4 +1,6 @@
-﻿namespace Chessour.Search;
+﻿using System.Collections;
+
+namespace Chessour.Search;
 
 internal ref struct MovePicker
 {
@@ -8,6 +10,8 @@ internal ref struct MovePicker
     private int curent;
     private int end;
     private Stage stage;
+
+    public Move Current { get; private set; }
 
     public MovePicker(Position position, Move ttMove, Span<MoveScore> buffer)
     {
@@ -39,6 +43,68 @@ internal ref struct MovePicker
         QSearchTT, QCaptureGenerate, QCapture
     }
 
+    public bool MoveNext()
+    {
+        while (true) 
+        {
+            switch (stage) 
+            {
+                //Transposition tables
+                case Stage.MainTT:
+                case Stage.EvasionTT:
+                case Stage.QSearchTT:
+                    stage++;
+                    Current = ttMove;
+                    return true;
+
+                //Normal Positions
+                case Stage.CaptureGenerate:
+                case Stage.QCaptureGenerate:
+                    end = MoveGenerator.GenerateCaptures(position, buffer[curent..]).Length;
+                    Score(GenerationType.Captures);
+                    PartialInsertionSort(curent, end);
+                    stage++;
+                    break;
+                case Stage.GoodCaptures:
+                    Current = FindNext();
+                    if (Current != Move.None)
+                        return true;
+                    ++stage;
+                    break;
+                case Stage.QuietGenerate:
+                    end = MoveGenerator.GenerateQuiets(position, buffer[curent..]).Length;
+                    stage++;
+                    break;
+                case Stage.Quiet:
+                    Current = FindNext();
+                    if(Current != Move.None)
+                        return true;
+                    ++stage;
+                    break;
+                case Stage.BadCaptures:
+                    Current = FindNext();
+                    return Current != Move.None;
+
+                case Stage.EvasionGenerate:
+                    end = MoveGenerator.GenerateEvasions(position, buffer[curent..]).Length;
+                    stage++;
+                    break;
+                case Stage.Evasions:
+                    Current = FindNext();
+                    return Current != Move.None;
+
+                case Stage.QCapture:
+                    Current = FindNext();
+                    return Current != Move.None;
+            }
+        }
+    }
+
+    public MovePicker GetEnumerator() 
+    {
+        return this;
+    }
+
     public Move NextMove()
     {
         top:
@@ -54,7 +120,7 @@ internal ref struct MovePicker
             //Normal Positions
             case Stage.CaptureGenerate:
             case Stage.QCaptureGenerate:
-                Generate(GenerationType.Captures);
+                end = MoveGenerator.GenerateCaptures(position, buffer[curent..]).Length;
                 Score(GenerationType.Captures);
                 PartialInsertionSort(curent, end);
                 stage++;
@@ -66,7 +132,7 @@ internal ref struct MovePicker
                 ++stage;
                 goto top;
             case Stage.QuietGenerate:
-                Generate(GenerationType.Quiets);
+                end = MoveGenerator.GenerateQuiets(position, buffer[curent..]).Length;
                 stage++;
                 goto top;
             case Stage.Quiet:
@@ -78,7 +144,7 @@ internal ref struct MovePicker
                 return FindNext();
 
             case Stage.EvasionGenerate:
-                Generate(GenerationType.Evasions);
+                end = MoveGenerator.GenerateEvasions(position, buffer[curent..]).Length;
                 stage++;
                 goto top;
             case Stage.Evasions:
@@ -92,11 +158,6 @@ internal ref struct MovePicker
         return Move.None;
     }
 
-    public void Generate(GenerationType type)
-    {
-        end = MoveGenerator.Generate(type, position, buffer[curent..]).Length;
-    }
-
     public void Score(GenerationType type)
     {
 
@@ -105,8 +166,8 @@ internal ref struct MovePicker
     private Move FindNext()
     {
         for (; curent < end; curent++)
-            if (buffer[curent] != ttMove)
-                return buffer[curent++];
+            if (buffer[curent].Move != ttMove)
+                return buffer[curent++].Move;
         return Move.None;
     }
 

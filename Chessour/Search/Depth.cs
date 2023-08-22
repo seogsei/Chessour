@@ -2,6 +2,7 @@
 {
     public static class DepthConstants
     {
+        public const int MAX_DEPTH = MAX_PLY + TTOffset;
         public const int MAX_PLY = 256;
 
         public const int Max = 256;
