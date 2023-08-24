@@ -109,8 +109,6 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GeneratePromotions(GenerationType type, Square from, Square to, MoveScore* pointer)
         {
-            Debug.Assert(false);
-
             if (type == Captures || type == Evasions || type == NonEvasions)
                 *pointer++ = CreatePromotionMove(from, to, PieceType.Queen);
 

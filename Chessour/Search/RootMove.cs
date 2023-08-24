@@ -1,5 +1,4 @@
-﻿using Chessour.Evaluation;
-using Chessour.Utilities;
+﻿using Chessour.Utilities;
 using System.Collections.Generic;
 
 namespace Chessour.Search

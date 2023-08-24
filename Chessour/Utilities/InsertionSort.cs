@@ -13,11 +13,10 @@ namespace Chessour.Utilities
             for (int i = start + 1; i < end; i++)
             {
                 T key = buffer[i];
+
                 int j = i - 1;
                 for (; j >= start && buffer[j] < key; j--)
-                {
                     buffer[j + 1] = buffer[j];
-                }
 
                 buffer[j + 1] = key;
             }

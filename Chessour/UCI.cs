@@ -1,6 +1,5 @@
 ﻿using Chessour.Search;
 using Chessour.Utilities;
-using Chessour.Evaluation;
 using static Chessour.BoardRepresentation;
 using System.Text;
 
@@ -162,9 +161,9 @@ namespace Chessour
 
         private void ShowEvaluation()
         {
-            Evaluator.Trace trace = new();
+            Evaluation.Trace trace = new();
 
-            Evaluator.Evaluate(position, trace);
+            Evaluation.Evaluate(position, trace);
 
             Console.WriteLine(trace);
         }
@@ -223,6 +222,7 @@ namespace Chessour
             sb.Append(" score ").Append(Value(rootMoves[0].UCIScore));
             sb.Append(" nodes ").Append(nodesSearched);
             sb.Append(" nps ").Append(nodesSearched * 1000 / (ulong)timeElapsed);
+            sb.Append(" hashfull ").Append(Engine.TTTable.Hashfull());
             sb.Append(" time ").Append(timeElapsed);
 
             sb.Append(" pv");
@@ -246,9 +246,9 @@ namespace Chessour
         
         public static string Value(int value) 
         {
-            if (Math.Abs(value) > Evaluator.MateInMaxPly) 
+            if (Math.Abs(value) > Evaluation.MateInMaxPly) 
             {
-                int mateDistance = ((value > 0 ? Evaluator.Mate - value + 1 : -Evaluator.Mate - value) / 2);
+                int mateDistance = ((value > 0 ? Evaluation.Mate - value + 1 : -Evaluation.Mate - value) / 2);
                 return "mate " + mateDistance;
             }
             else

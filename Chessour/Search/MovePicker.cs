@@ -4,10 +4,11 @@ namespace Chessour.Search;
 
 internal ref struct MovePicker
 {
+    private readonly Span<MoveScore> buffer;
     private readonly Position position;
     private readonly Move ttMove;
-    private readonly Span<MoveScore> buffer;
-    private int curent;
+    private readonly Square refutationSquare;
+    private int pointer;
     private int end;
     private Stage stage;
 
@@ -18,19 +19,21 @@ internal ref struct MovePicker
         this.buffer = buffer;
         this.position = position;
         this.ttMove = ttMove;
-        curent = end = 0;
+        this.refutationSquare = Square.None;
+        pointer = end = 0;
         stage = position.IsCheck() ? Stage.EvasionTT : Stage.MainTT;
 
         if (ttMove == Move.None || !position.IsPseudoLegal(ttMove))
             stage++;
     }
 
-    public MovePicker(Position position, Move ttMove, Square s, Span<MoveScore> buffer)
+    public MovePicker(Position position, Move ttMove, Square refutationSquare, Span<MoveScore> buffer)
     {
         this.buffer = buffer;
         this.position = position;
         this.ttMove = ttMove;
-        curent = end = 0;
+        this.refutationSquare = refutationSquare;
+        pointer = end = 0;
         stage = position.IsCheck() ? Stage.EvasionTT : Stage.QSearchTT;
         if (ttMove == Move.None || !position.IsPseudoLegal(ttMove))
             stage++;
@@ -60,33 +63,37 @@ internal ref struct MovePicker
                 //Normal Positions
                 case Stage.CaptureGenerate:
                 case Stage.QCaptureGenerate:
-                    end = MoveGenerator.GenerateCaptures(position, buffer[curent..]).Length;
+                    end = pointer + MoveGenerator.GenerateCaptures(position, buffer[pointer..]).Length;
                     Score(GenerationType.Captures);
-                    PartialInsertionSort(curent, end);
+                    Sort(pointer, end);
                     stage++;
                     break;
                 case Stage.GoodCaptures:
                     Current = FindNext();
                     if (Current != Move.None)
                         return true;
-                    ++stage;
+                    stage++;
                     break;
                 case Stage.QuietGenerate:
-                    end = MoveGenerator.GenerateQuiets(position, buffer[curent..]).Length;
+                    end = pointer + MoveGenerator.GenerateQuiets(position, buffer[pointer..]).Length;
+                    Score(GenerationType.Quiets);
+                    Sort(pointer, end);
                     stage++;
                     break;
                 case Stage.Quiet:
                     Current = FindNext();
                     if(Current != Move.None)
                         return true;
-                    ++stage;
+                    stage++;
                     break;
                 case Stage.BadCaptures:
                     Current = FindNext();
-                    return Current != Move.None;
+                    if (Current != Move.None)
+                        return true;
+                    return false;
 
                 case Stage.EvasionGenerate:
-                    end = MoveGenerator.GenerateEvasions(position, buffer[curent..]).Length;
+                    end = pointer + MoveGenerator.GenerateEvasions(position, buffer[pointer..]).Length;
                     stage++;
                     break;
                 case Stage.Evasions:
@@ -105,89 +112,59 @@ internal ref struct MovePicker
         return this;
     }
 
-    public Move NextMove()
-    {
-        top:
-        switch (stage)
-        {
-            //Transposition tables
-            case Stage.MainTT:
-            case Stage.EvasionTT:
-            case Stage.QSearchTT:
-                stage++;
-                return ttMove;
-
-            //Normal Positions
-            case Stage.CaptureGenerate:
-            case Stage.QCaptureGenerate:
-                end = MoveGenerator.GenerateCaptures(position, buffer[curent..]).Length;
-                Score(GenerationType.Captures);
-                PartialInsertionSort(curent, end);
-                stage++;
-                goto top;
-
-            case Stage.GoodCaptures:
-                if (FindNext() != Move.None)
-                    return buffer[curent - 1];
-                ++stage;
-                goto top;
-            case Stage.QuietGenerate:
-                end = MoveGenerator.GenerateQuiets(position, buffer[curent..]).Length;
-                stage++;
-                goto top;
-            case Stage.Quiet:
-                if (FindNext() != Move.None)
-                    return buffer[curent - 1];
-                ++stage;
-                goto top;
-            case Stage.BadCaptures:
-                return FindNext();
-
-            case Stage.EvasionGenerate:
-                end = MoveGenerator.GenerateEvasions(position, buffer[curent..]).Length;
-                stage++;
-                goto top;
-            case Stage.Evasions:
-                return FindNext();
-
-            case Stage.QCapture:
-                return FindNext();
-        }
-
-        Debug.Assert(false);
-        return Move.None;
-    }
-
     public void Score(GenerationType type)
     {
-
+        switch (type)
+        {
+            case GenerationType.Captures:
+                for(int i = pointer; i< end; i++)
+                {
+                    Move move = buffer[i].Move;
+                    buffer[i].Score = Evaluation.Pieces.PieceValue(position.PieceAt(move.DestinationSquare()))
+                                    - Evaluation.Pieces.PieceValue(position.PieceAt(move.OriginSquare()));
+                }
+                return;
+            case GenerationType.Quiets:
+                for (int i = pointer; i < end; i++)
+                {
+                    Move move = buffer[i].Move;
+                    Piece piece = position.PieceAt(move.OriginSquare());
+                    buffer[i].Score = Evaluation.PSQT.Get(piece, move.DestinationSquare()).MidGame
+                                    - Evaluation.PSQT.Get(piece, move.OriginSquare()).MidGame
+                                    + move.Type() == MoveType.Promotion ? Evaluation.Pieces.PieceValue(PieceType.Queen) : 0;
+                }
+                return;
+        }
     }
 
     private Move FindNext()
     {
-        for (; curent < end; curent++)
-            if (buffer[curent].Move != ttMove)
-                return buffer[curent++].Move;
+        while(pointer < end)
+        {
+            Move move = buffer[pointer++].Move;
+
+            if (move != ttMove)
+                return move;
+        }
+
         return Move.None;
     }
 
-    private void PartialInsertionSort(int start, int end)
+    private void Sort(int start, int end)
     {
-        for (int i = start; i < end; ++i)
+        for (int i = start + 1; i < end; i++)
         {
-            MoveScore m = buffer[i];
-            int j = i - 1;
+            var move = buffer[i];
 
+            int j = i - 1;
             // Move elements of arr[0..i-1],
             // that are greater than key,
             // to one position ahead of
             // their current position
-            while (j >= 0 && buffer[j] > m)
-            {
+            for (; j >= start && buffer[j] < move; j--)
                 buffer[j + 1] = buffer[j];
-                j--;
-            }
-            buffer[j + 1] = m;
+                
+            buffer[j + 1] = move;
         }
     }
 }

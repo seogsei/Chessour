@@ -1,4 +1,4 @@
-﻿namespace Chessour.Evaluation
+﻿namespace Chessour
 {
     public readonly struct ScoreExt
     {

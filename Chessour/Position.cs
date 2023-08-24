@@ -1,5 +1,4 @@
-﻿using Chessour.Evaluation;
-using Chessour.Search;
+﻿using Chessour.Search;
 using Chessour.Utilities;
 using System.Text;
 using static Chessour.Bitboards;
@@ -785,7 +784,8 @@ namespace Chessour
             colorBitboards[(int)piece.ColorOf()] |= squareBB;
             pieceCounts[(int)piece]++;
 
-            PSQScore += PSQT.GetScore(piece, square);
+            PSQScore += Evaluation.PSQT.Get(piece, square);
+            Phase += (int)piece.PhaseValue();
         }
 
         private void RemovePieceAt(Square square)
@@ -799,7 +799,8 @@ namespace Chessour
             colorBitboards[(int)piece.ColorOf()] ^= squareBB;
             pieceCounts[(int)piece]--;
 
-            PSQScore -= PSQT.GetScore(piece, square);
+            PSQScore -= Evaluation.PSQT.Get(piece, square);
+            Phase -= piece.PhaseValue();
         }
 
         private void MovePiece(Square from, Square to)
@@ -813,7 +814,7 @@ namespace Chessour
             typeBitboards[(int)piece.TypeOf()] ^= fromto;
             colorBitboards[(int)piece.ColorOf()] ^= fromto;
 
-            PSQScore += PSQT.GetScore(piece, to) - PSQT.GetScore(piece, from);
+            PSQScore += Evaluation.PSQT.Get(piece, to) - Evaluation.PSQT.Get(piece, from);
         }
 
         public override string ToString()

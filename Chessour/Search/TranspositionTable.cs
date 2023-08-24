@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using Chessour.Utilities;
+using System.Numerics;
 using System.Runtime.InteropServices;
 
 namespace Chessour.Search
@@ -12,12 +13,11 @@ namespace Chessour.Search
 
     internal class TranspositionTable
     {
-        public TranspositionTable(uint initialSizeInMB = 16)
+        public TranspositionTable(uint initialSizeInMB = 64)
         {
             Resize(initialSizeInMB);
 
-            if (array is null)
-                throw new Exception();
+            Debug.Assert(array is not null);
         }
 
         private Entry[] array;
@@ -62,6 +62,19 @@ namespace Chessour.Search
         private ref Entry GetEntry(Key key)
         {
             return ref array[(ulong)key & ((ulong)array.Length - 1)];
+        }
+
+        public int Hashfull()
+        {
+            XORSHift64 prng = new(1453);
+
+            int counter = 0;
+
+            for(int i = 0; i < 1000; i++)
+                if (GetEntry((Key)prng.NextUInt64()).Depth > DepthConstants.TTOffset)
+                    counter++;
+
+            return counter;
         }
 
         public struct Entry
@@ -115,15 +128,8 @@ namespace Chessour.Search
 
             public void Save(Key key, bool isPV, Move move, int depth, Bound boundType, int evaluation)
             {
-                if (move != Move.None || key != Key)
-                    Move = move;
-
-                if (boundType == Bound.Exact
-                    || key != Key
-                    || depth - DepthConstants.TTOffset + (isPV ? 2 : 0) > Depth + 1)
+                if (depth > Depth)
                 {
-                    Debug.Assert(depth > DepthConstants.TTOffset && depth < 256 + DepthConstants.TTOffset);
-
                     Key = key;
                     Move = move;
                     Depth = depth;
