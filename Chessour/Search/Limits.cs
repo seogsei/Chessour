@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace Chessour.Search 
+namespace Chessour.Search
 {
     internal sealed class Limits
     {

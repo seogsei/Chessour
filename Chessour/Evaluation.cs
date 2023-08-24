@@ -116,8 +116,8 @@ namespace Chessour
                         break;
 
                     occupied ^= bb.LeastSignificantBit();
-                    attackers |= BishopAttacks(to, occupied) & position.Pieces(PieceType.Bishop, PieceType.Queen)
-                              | RookAttacks(to, occupied) & position.Pieces(PieceType.Rook, PieceType.Queen);
+                    attackers |= (BishopAttacks(to, occupied) & position.Pieces(PieceType.Bishop, PieceType.Queen))
+                              | (RookAttacks(to, occupied) & position.Pieces(PieceType.Rook, PieceType.Queen));
                 }
                 else
                 {
@@ -187,9 +187,9 @@ namespace Chessour
 
             Phase phase = position.Phase;
 
-            phase = (Phase)(((int)phase * 256 + (int)Phase.Total / 2) / (int)Phase.Total);
+            phase = (Phase)((((int)phase * 256) + ((int)Phase.Total / 2)) / (int)Phase.Total);
 
-            int result = (eg * (256 - (int)phase) + mg * (int)phase) / 256;
+            int result = ((eg * (256 - (int)phase)) + (mg * (int)phase)) / 256;
 
             trace?.Set(Trace.Term.Total, Color.White, score);
 

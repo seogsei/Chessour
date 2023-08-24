@@ -16,7 +16,7 @@ internal partial class SearchThread
         rootMoves = new();
 
         syncPrimitive = new();
-       
+
         Searching = true;
         thread = new(Loop)
         {

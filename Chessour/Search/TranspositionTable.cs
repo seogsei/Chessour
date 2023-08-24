@@ -70,7 +70,7 @@ namespace Chessour.Search
 
             int counter = 0;
 
-            for(int i = 0; i < 1000; i++)
+            for (int i = 0; i < 1000; i++)
                 if (GetEntry((Key)prng.NextUInt64()).Depth > DepthConstants.TTOffset)
                     counter++;
 
@@ -86,13 +86,14 @@ namespace Chessour.Search
             private ushort move16;
             private short evaluation16;
             private byte extras8;
-            private byte depth8;       
+            private byte depth8;
 
-            public Key Key { 
+            public Key Key
+            {
                 get => key64;
                 private set => key64 = value;
             }
-            public Move Move 
+            public Move Move
             {
                 get => (Move)move16;
                 private set => move16 = (ushort)value;
@@ -108,20 +109,20 @@ namespace Chessour.Search
                 set => evaluation16 = (short)value;
             }
 
-            public Bound BoundType 
-            { 
+            public Bound BoundType
+            {
                 get => (Bound)(extras8 & 3);
             }
-            public bool IsPV 
-            { 
+            public bool IsPV
+            {
                 get => (extras8 & 4) != 0;
             }
-            public int Generation 
-            { 
+            public int Generation
+            {
                 get => extras8 >> 3;
             }
 
-            private void WriteExtras(int generation, bool isPV, Bound boundType) 
+            private void WriteExtras(int generation, bool isPV, Bound boundType)
             {
                 extras8 = (byte)((generation << 3) + (isPV ? 4 : 0) + boundType);
             }

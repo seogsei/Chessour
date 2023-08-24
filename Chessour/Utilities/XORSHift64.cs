@@ -2,7 +2,7 @@
 {
     public struct XORSHift64
     {
-        public XORSHift64() 
+        public XORSHift64()
         {
             throw new InvalidOperationException();
         }

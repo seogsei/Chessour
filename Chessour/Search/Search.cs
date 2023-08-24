@@ -7,7 +7,7 @@ namespace Chessour.Search
 {
     internal partial class SearchThread
     {
-        enum NodeType
+        private enum NodeType
         {
             Root,
             PV,
@@ -124,7 +124,7 @@ namespace Chessour.Search
 
                     if ((MasterThread)this is not null)
                     {
-                        if (bestValue <= alpha || bestValue >= beta && Engine.TimeManager.Elapsed() > 3000)
+                        if (bestValue <= alpha || (bestValue >= beta && Engine.TimeManager.Elapsed() > 3000))
                         {
                             UCI.SendPV(this, depth);
                         }
@@ -193,7 +193,7 @@ namespace Chessour.Search
             Debug.Assert(beta <= Infinite);
 
             //Check to see if this is a pv node or we are in aspiration window search
-            Debug.Assert(IsPV() || (alpha == beta - 1)); 
+            Debug.Assert(IsPV() || (alpha == beta - 1));
 
             //Check to see if depth values are in allowed range
             Debug.Assert(depth > 0 && depth < MAX_DEPTH);
@@ -201,9 +201,9 @@ namespace Chessour.Search
             int score = -Infinite;
             int bestScore = -Infinite;
             Move bestMove = Move.None;
-            Span<Move> childPv = stackalloc Move[MAX_PLY]; 
+            Span<Move> childPv = stackalloc Move[MAX_PLY];
 
-            Position.StateInfo state = states[ply]; 
+            Position.StateInfo state = states[ply];
 
             stack[ply].inCheck = position.IsCheck();
 
@@ -235,7 +235,7 @@ namespace Chessour.Search
             Move ttMove = stack[ply].ttHit ? ttentry.Move : Move.None;
             bool ttCapture = ttMove != Move.None && position.IsCapture(ttMove);
 
-            
+
             if (stack[ply].inCheck)
             {
                 stack[ply].evaluation = -Infinite;
@@ -255,7 +255,7 @@ namespace Chessour.Search
                 && stack[ply - 1].currentMove != Move.Null
                 && stack[ply].evaluation >= beta)
             {
-                int R = depth / 4 + 3;
+                int R = (depth / 4) + 3;
 
                 stack[ply].currentMove = Move.Null;
 
@@ -264,16 +264,16 @@ namespace Chessour.Search
                 int nullScore = -NodeSearch(NodeType.NonPV, stack, -beta, -alpha, ply + 1, depth - R);
                 position.TakebackNullMove();
 
-                if(nullScore >= beta)
+                if (nullScore >= beta)
                 {
                     depth -= 4;
-                }        
+                }
             }
 
             movesloop:
             MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
             int moveCount = 0;
-            foreach (Move move in movePicker) 
+            foreach (Move move in movePicker)
             {
                 if (IsRoot())
                 {
@@ -345,7 +345,7 @@ namespace Chessour.Search
                     else
                         rootMove.Score = -Infinite;
                 }
-                
+
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -358,7 +358,7 @@ namespace Chessour.Search
                         {
                             UpdatePV(pv, move, childPv);
                         }
-                        if(score >= beta)
+                        if (score >= beta)
                         {
                             break;
                         }
@@ -406,10 +406,10 @@ namespace Chessour.Search
             Debug.Assert(beta <= Infinite);
 
             //This is a pv node or we are in a aspiration search
-            Debug.Assert(IsPV() || alpha == beta - 1); 
-           
+            Debug.Assert(IsPV() || alpha == beta - 1);
+
             //Depth is negative
-            Debug.Assert(depth <= 0 && depth > TTOffset); 
+            Debug.Assert(depth <= 0 && depth > TTOffset);
 
             Span<Move> childPV = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[ply];
@@ -475,8 +475,8 @@ namespace Chessour.Search
                 if (IsPV() && bestValue > alpha)
                     alpha = bestValue;
             }
-           
-            MovePicker movePicker = new(position, ttMove, ss[ply-1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
+
+            MovePicker movePicker = new(position, ttMove, ss[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerator.MAX_MOVE_COUNT]);
             int moveCount = 0;
             foreach (Move move in movePicker)
             {
@@ -556,8 +556,8 @@ namespace Chessour.Search
             int i = 0, j = 0;
             pv[i++] = move;
             // Has the child pv ended
-            while (childPv[j] != Move.None) 
-            {              
+            while (childPv[j] != Move.None)
+            {
                 pv[i++] = childPv[j++]; // Copy the moves from the child pv
             }
 

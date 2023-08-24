@@ -1,9 +1,10 @@
 ﻿using Chessour.Utilities;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace Chessour.Search
 {
-    public class RootMove : IArithmeticComparable<RootMove>
+    public class RootMove : IComparisonOperators<RootMove, RootMove, bool>
     {
         public RootMove(Move move)
         {
@@ -28,34 +29,51 @@ namespace Chessour.Search
             get => PV[1];
         }
 
-        public static bool operator <(RootMove lhs, RootMove rhs)
+        public static bool operator <=(RootMove left, RootMove right)
         {
-            return lhs.Score != rhs.Score ? lhs.Score < rhs.Score
-                                          : lhs.PreviousScore < rhs.PreviousScore;
+            return left.Score != right.Score ? left.Score <= right.Score
+                                             : left.PreviousScore <= right.PreviousScore;
         }
-
-        public static bool operator >(RootMove lhs, RootMove rhs)
+        public static bool operator >=(RootMove left, RootMove right)
         {
-            return lhs.Score != rhs.Score ? lhs.Score > rhs.Score
-                                          : lhs.PreviousScore > rhs.PreviousScore;
+            return left.Score != right.Score ? left.Score >= right.Score
+                                             : left.PreviousScore >= right.PreviousScore;
+        }
+        public static bool operator <(RootMove left, RootMove right)
+        {
+            return left.Score != right.Score ? left.Score < right.Score
+                                             : left.PreviousScore < right.PreviousScore;
+        }
+        public static bool operator >(RootMove left, RootMove right)
+        {
+            return left.Score != right.Score ? left.Score > right.Score
+                                             : left.PreviousScore > right.PreviousScore;
+        }
+        static bool IEqualityOperators<RootMove, RootMove, bool>.operator ==(RootMove? left, RootMove? right)
+        {
+            throw new NotImplementedException();
+        }
+        static bool IEqualityOperators<RootMove, RootMove, bool>.operator !=(RootMove? left, RootMove? right)
+        {
+            throw new NotImplementedException();
         }
     }
 
-    public static class RootMoveListExtensions 
+    public static class RootMoveListExtensions
     {
-        public static bool Contains(this List<RootMove> rootMoves, Move m)
+        public static bool Contains(this List<RootMove> rootMoves, Move move)
         {
             foreach (var rootMove in rootMoves)
-                if (rootMove.Move == m)
+                if (rootMove.Move == move)
                     return true;
 
             return false;
         }
 
-        public static RootMove? Find(this List<RootMove> rootMoves, Move m)
+        public static RootMove? Find(this List<RootMove> rootMoves, Move move)
         {
             foreach (var rootMove in rootMoves)
-                if (rootMove.Move == m)
+                if (rootMove.Move == move)
                     return rootMove;
 
             return null;

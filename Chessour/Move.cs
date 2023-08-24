@@ -1,8 +1,4 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Numerics;
-using System.Runtime.InteropServices;
-
-namespace Chessour
+﻿namespace Chessour
 {
     public enum MoveType
     {
@@ -10,7 +6,7 @@ namespace Chessour
         Promotion = 1 << 12,
         EnPassant = 2 << 12,
         Castling = 3 << 12,
-        Mask = 3 <<12
+        Mask = 3 << 12
     }
 
     public enum Move
@@ -27,7 +23,7 @@ namespace Chessour
     {
         public static Move CreateMove(Square origin, Square destination)
         {
-            return (Move) (((int)destination << 6) | (int)origin);
+            return (Move)(((int)destination << 6) | (int)origin);
         }
         public static Move CreateCastlingMove(Square origin, Square destination)
         {

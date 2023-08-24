@@ -1,14 +1,15 @@
 ﻿using System.Collections.Generic;
+using System.Numerics;
 
 namespace Chessour.Utilities
 {
     public static partial class Utility
     {
-        public static void InsertionSort<T>(Span<T> buffer) where T : IArithmeticComparable<T>
+        public static void InsertionSort<T>(Span<T> buffer) where T : IComparisonOperators<T, T, bool>
         {
             PartialInsertionSort(buffer, 0, buffer.Length);
         }
-        public static void PartialInsertionSort<T>(Span<T> buffer, int start, int end) where T : IArithmeticComparable<T>
+        public static void PartialInsertionSort<T>(Span<T> buffer, int start, int end) where T : IComparisonOperators<T, T, bool>
         {
             for (int i = start + 1; i < end; i++)
             {
@@ -22,11 +23,11 @@ namespace Chessour.Utilities
             }
         }
 
-        public static void InsertionSort<T>(IList<T> buffer) where T : IArithmeticComparable<T>
+        public static void InsertionSort<T>(IList<T> buffer) where T : IComparisonOperators<T, T, bool>
         {
             PartialInsertionSort(buffer, 0, buffer.Count);
         }
-        public static void PartialInsertionSort<T>(IList<T> buffer, int start, int end) where T : IArithmeticComparable<T>
+        public static void PartialInsertionSort<T>(IList<T> buffer, int start, int end) where T : IComparisonOperators<T, T, bool>
         {
             for (int i = start + 1; i < end; i++)
             {

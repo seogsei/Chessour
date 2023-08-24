@@ -1,7 +1,7 @@
 ﻿using Chessour.Search;
 using Chessour.Utilities;
-using static Chessour.BoardRepresentation;
 using System.Text;
+using static Chessour.BoardRepresentation;
 
 namespace Chessour
 {
@@ -211,7 +211,7 @@ namespace Chessour
 
         internal static void SendPV(SearchThread thread, int depth)
         {
-            StringBuilder sb = new (4 * 1024);
+            StringBuilder sb = new(4 * 1024);
 
             var rootMoves = thread.rootMoves;
             ulong nodesSearched = Engine.Threads.TotalNodesSearched();
@@ -243,19 +243,19 @@ namespace Chessour
 
             return Chessour.Move.None;
         }
-        
-        public static string Value(int value) 
+
+        public static string Value(int value)
         {
-            if (Math.Abs(value) > Evaluation.MateInMaxPly) 
+            if (Math.Abs(value) > Evaluation.MateInMaxPly)
             {
-                int mateDistance = ((value > 0 ? Evaluation.Mate - value + 1 : -Evaluation.Mate - value) / 2);
+                int mateDistance = (value > 0 ? Evaluation.Mate - value + 1 : -Evaluation.Mate - value) / 2;
                 return "mate " + mateDistance;
             }
             else
                 return "cp " + value;
         }
 
-        public static string Move(Move move) 
+        public static string Move(Move move)
         {
             if (move == Chessour.Move.None)
                 return "(none)";

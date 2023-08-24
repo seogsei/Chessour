@@ -239,7 +239,7 @@ namespace Chessour
                 return (RookAttacks(ksq, occupancy) & Pieces(us.Flip(), Queen, Rook)).IsEmpty()
                     && (BishopAttacks(ksq, occupancy) & Pieces(us.Flip(), Queen, Bishop)).IsEmpty();
             }
-            
+
             if (type == MoveType.Castling)
             {
                 destination = (destination > origin ? Square.g1 : Square.c1).RelativeTo(us);
@@ -823,7 +823,7 @@ namespace Chessour
 
             sb.AppendLine(" +---+---+---+---+---+---+---+---+");
 
-            for(Rank r = Rank.R8; r >= Rank.R1; r--) 
+            for (Rank r = Rank.R8; r >= Rank.R1; r--)
             {
                 for (File f = File.a; f <= File.h; f++)
                     sb.Append(" | ").Append(PieceToChar(PieceAt(MakeSquare(f, r))));

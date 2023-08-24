@@ -7,7 +7,7 @@
         Bishop = 2,
         Rook = 4,
         Queen = 8,
-        Total = 16 * Pawn + 4 * Knight + 4 * Bishop + 4 * Rook + 2 * Queen,
+        Total = (16 * Pawn) + (4 * Knight) + (4 * Bishop) + (4 * Rook) + (2 * Queen),
     }
 
     public static class PhaseExtensions
@@ -23,7 +23,7 @@
             0
         };
 
-        public static Phase PhaseValue (this Piece piece)
+        public static Phase PhaseValue(this Piece piece)
         {
             return PhaseValue(piece.TypeOf());
         }

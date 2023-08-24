@@ -14,7 +14,7 @@ namespace Chessour
 
         private static readonly Stopwatch timer = new();
 
-        public static ThreadPool Threads { get; private set; } = new (1);
+        public static ThreadPool Threads { get; private set; } = new(1);
         public static TranspositionTable TTTable { get; private set; } = new();
         public static TimeManager TimeManager { get; private set; } = new();
         public static Limits SearchLimits { get; private set; }
