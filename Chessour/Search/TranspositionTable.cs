@@ -13,7 +13,7 @@ namespace Chessour.Search
 
     internal class TranspositionTable
     {
-        public TranspositionTable(uint initialSizeInMB = 64)
+        public TranspositionTable(uint initialSizeInMB = 128)
         {
             Resize(initialSizeInMB);
 
@@ -38,11 +38,11 @@ namespace Chessour.Search
             Array.Clear(array);
         }
 
-        public void Resize(uint sizeInMB)
+        public unsafe void Resize(uint sizeInMB)
         {
-            Engine.Threads.WaitForSeachFinish();
+            Engine.Threads.WaitForSearchFinish();
 
-            nuint entryCount = (nuint)(sizeInMB * 1024 * 1024 / Marshal.SizeOf<Entry>());
+            nuint entryCount = (nuint)(sizeInMB * 1024 * 1024 / sizeof(Entry));
 
             //Round the size to next smaller power of two for hashing reasons
             entryCount = BitOperations.RoundUpToPowerOf2(entryCount / 2);
@@ -108,7 +108,6 @@ namespace Chessour.Search
                 get => evaluation16;
                 set => evaluation16 = (short)value;
             }
-
             public Bound BoundType
             {
                 get => (Bound)(extras8 & 3);

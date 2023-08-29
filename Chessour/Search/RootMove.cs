@@ -81,7 +81,7 @@ namespace Chessour.Search
 
         public static void Sort(this List<RootMove> rootMoves, int start = 0)
         {
-            Utility.PartialInsertionSort(rootMoves, start, rootMoves.Count);
+            InsertionSort.PartialSort(rootMoves, start, rootMoves.Count);
         }
     }
 }

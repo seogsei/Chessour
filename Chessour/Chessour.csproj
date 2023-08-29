@@ -7,5 +7,8 @@
         <Platforms>AnyCPU</Platforms>
 		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
 		<OutDir>C:\Program Files (x86)\Arena\Engines\Chessour(Dev)</OutDir>
-    </PropertyGroup>	
+    </PropertyGroup>
+    <ItemGroup>
+      <PackageReference Include="NUnit" Version="3.13.3" />
+    </ItemGroup>	
 </Project>

@@ -9,31 +9,33 @@ namespace Chessour
 
         static Engine()
         {
-            timer.Start();
+            Threads = new(1);
+
+            TTTable = new(128);
+
+            Timer = new();
         }
 
-        private static readonly Stopwatch timer = new();
+        public static bool Stop { get; set; }
+        public static ThreadPool Threads { get; private set; }
+        public static TranspositionTable TTTable { get; private set; }
+        public static TimeManager Timer { get; private set; }
+        public static UCI.GoParameters SearchLimits { get; private set; }
+        public static bool Ponder { get; set; }
 
-        public static ThreadPool Threads { get; private set; } = new(1);
-        public static TranspositionTable TTTable { get; private set; } = new();
-        public static TimeManager TimeManager { get; private set; } = new();
-        public static Limits SearchLimits { get; private set; }
-        public static long Now => timer.ElapsedMilliseconds;
-
-        public static void StartThinking(Position position, in Limits limits)
+        public static void StartThinking(Position position, in UCI.GoParameters limits, bool ponder)
         {
             Threads.Master.WaitForSearchFinish();
 
+            Stop = false;
+
             SearchLimits = limits;
-            TimeManager.Initialize(limits, position.ActiveColor, 0);
+            Timer.Initialize(position.ActiveColor, limits);
 
-            foreach (var th in Threads)
-            {
-                th.SetPosition(position, limits.Moves);
-                th.ResetSearchStats();
-            }
+            foreach (var thread in Threads)
+                thread.searcher.SetSearchParameters(position, limits.Moves);
 
-            SearchThread.Stop = false;
+            Ponder = ponder;
 
             Threads.Master.Release();
         }

@@ -1,10 +1,8 @@
-﻿using Chessour.Search;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 
-namespace Chessour
+namespace Chessour.Search
 {
-
-    internal sealed class ThreadPool : List<SearchThread>
+    internal sealed class ThreadPool : List<Thread>
     {
         public ThreadPool(int initialSize)
         {
@@ -17,12 +15,12 @@ namespace Chessour
         {
             ulong total = 0;
             foreach (var thread in this)
-                total += thread.NodeCount;
+                total += thread.searcher.NodeCount;
 
             return total;
         }
 
-        public void WaitForSeachFinish()
+        public void WaitForSearchFinish()
         {
             Master.WaitForSearchFinish();
         }
@@ -32,7 +30,7 @@ namespace Chessour
             //Remove every thread
             while (Count > 0)
             {
-                WaitForSeachFinish();
+                WaitForSearchFinish();
 
                 while (Count > 0)
                 {
@@ -47,7 +45,7 @@ namespace Chessour
                 Add(new MasterThread());
 
                 while (Count < expected)
-                    Add(new SearchThread());
+                    Add(new Thread());
             }
         }
     }

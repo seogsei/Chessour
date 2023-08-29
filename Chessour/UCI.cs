@@ -1,7 +1,9 @@
-﻿using Chessour.Search;
+﻿using Chessour.Evaluation;
+using Chessour.Search;
 using Chessour.Utilities;
+using System.Collections.Generic;
 using System.Text;
-using static Chessour.BoardRepresentation;
+using static Chessour.Factory;
 
 namespace Chessour
 {
@@ -34,7 +36,7 @@ namespace Chessour
                 switch (command)
                 {
                     case "quit" or "stop":
-                        SearchThread.Stop = true;
+                        Engine.Stop = true;
                         break;
                     case "ponderhit":
                         throw new NotImplementedException();
@@ -104,9 +106,9 @@ namespace Chessour
 
         private void Go(ref UCIStream ss)
         {
-            Limits limits = new()
+            GoParameters limits = new()
             {
-                StartTime = Engine.Now
+                StartTime = TimeManager.Now()
             };
 
             bool ponder = false;
@@ -115,6 +117,7 @@ namespace Chessour
                 switch (token)
                 {
                     case "searchmoves":
+                        limits.Moves = new();
                         while (ss.Extract(out token))
                             limits.Moves.Add(ParseMove(position, token));
                         break;
@@ -156,14 +159,14 @@ namespace Chessour
                         break;
                 }
 
-            Engine.StartThinking(position, in limits);
+            Engine.StartThinking(position, limits, ponder);
         }
 
         private void ShowEvaluation()
         {
-            Evaluation.Trace trace = new();
+            Evaluator.Trace trace = new();
 
-            Evaluation.Evaluate(position, trace);
+            Evaluator.Evaluate(position, trace);
 
             Console.WriteLine(trace);
         }
@@ -172,7 +175,7 @@ namespace Chessour
         {
             ulong nodes = 0;
 
-            long elapsed = Engine.Now;
+            long elapsed = TimeManager.Now();
             ss.Extract(out string token);
 
             if (token == "go")
@@ -181,11 +184,11 @@ namespace Chessour
 
                 Go(ref ss);
 
-                Engine.Threads.WaitForSeachFinish();
+                Engine.Threads.WaitForSearchFinish();
                 nodes += Engine.Threads.TotalNodesSearched();
             }
 
-            elapsed = Engine.Now - elapsed + 1;
+            elapsed = TimeManager.Now() - elapsed + 1;
 
             Console.WriteLine($"""
 
@@ -209,17 +212,17 @@ namespace Chessour
                 """);
         }
 
-        internal static void SendPV(SearchThread thread, int depth)
+        internal static void SendPV(Searcher searcher, int depth)
         {
             StringBuilder sb = new(4 * 1024);
 
-            var rootMoves = thread.rootMoves;
+            var rootMove = searcher.rootMoves[0];
             ulong nodesSearched = Engine.Threads.TotalNodesSearched();
-            var timeElapsed = Engine.TimeManager.Elapsed() + 1;
+            var timeElapsed = Engine.Timer.Elapsed() + 1;
 
             sb.Append("info depth ").Append(depth);
-            sb.Append(" seldepth ").Append(rootMoves[0].SelectiveDepth);
-            sb.Append(" score ").Append(Value(rootMoves[0].UCIScore));
+            sb.Append(" seldepth ").Append(rootMove.SelectiveDepth);
+            sb.Append(" score ").Append(Value(rootMove.UCIScore));
             sb.Append(" nodes ").Append(nodesSearched);
             sb.Append(" nps ").Append(nodesSearched * 1000 / (ulong)timeElapsed);
             sb.Append(" hashfull ").Append(Engine.TTTable.Hashfull());
@@ -227,7 +230,7 @@ namespace Chessour
 
             sb.Append(" pv");
 
-            foreach (Move move in rootMoves[0].PV)
+            foreach (Move move in rootMove.PV)
                 sb.Append(' ').Append(Move(move));
 
             Console.WriteLine(sb.ToString());
@@ -235,7 +238,7 @@ namespace Chessour
 
         public static Move ParseMove(Position position, string str)
         {
-            var moves = MoveGenerator.GenerateLegal(position, stackalloc MoveScore[256]);
+            var moves = MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]);
 
             foreach (Move m in moves)
                 if (str == Move(m))
@@ -246,9 +249,9 @@ namespace Chessour
 
         public static string Value(int value)
         {
-            if (Math.Abs(value) > Evaluation.MateInMaxPly)
+            if (Math.Abs(value) > Evaluator.MateInMaxPly)
             {
-                int mateDistance = (value > 0 ? Evaluation.Mate - value + 1 : -Evaluation.Mate - value) / 2;
+                int mateDistance = (value > 0 ? Evaluator.MateValue - value + 1 : -Evaluator.MateValue - value) / 2;
                 return "mate " + mateDistance;
             }
             else
@@ -265,15 +268,43 @@ namespace Chessour
 
             Square origin = move.OriginSquare();
             Square destination = move.DestinationSquare();
+            MoveType type = move.Type();
 
-            if (move.Type() == MoveType.Castling)
+            if (type == MoveType.Castling)
                 destination = MakeSquare(destination > origin ? File.g : File.c, origin.GetRank());
 
             string moveString = string.Concat(origin, destination);
-            if (move.Type() == MoveType.Promotion)
+            if (type == MoveType.Promotion)
                 moveString += " pnbrqk"[(int)move.PromotionPiece()];
 
             return moveString;
+        }
+
+        internal struct GoParameters
+        {
+            public int Perft;
+
+            public List<Move>? Moves;
+
+            public long StartTime;
+
+            public long WhiteTime;
+            public long BlackTime;
+            public long WhiteIncrement;
+            public long BlackIncrement;
+            public long MoveTime;
+            public int MovesToGo;
+
+            public int Mate;
+            public int Depth;
+            public long Nodes;
+
+            public bool Infinite;
+
+            public bool RequiresTimeManagement()
+            {
+                return WhiteTime != 0 || BlackTime != 0;
+            }
         }
     }
 }

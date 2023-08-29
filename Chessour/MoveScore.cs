@@ -7,7 +7,7 @@ namespace Chessour.Search
         public MoveScore(Move move)
         {
             Move = move;
-            Score = 0;
+            Score = default;
         }
 
         public MoveScore(Move move, int score)

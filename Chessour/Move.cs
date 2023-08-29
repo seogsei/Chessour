@@ -18,7 +18,6 @@
     /// <summary>
     /// Single field structs are slower compared to enums in C# so for performance reasons we use an enum with extension methods
     /// </summary>
-
     public static class MoveExtensions
     {
         public static Move CreateMove(Square origin, Square destination)
@@ -54,6 +53,17 @@
         public static PieceType PromotionPiece(this Move move)
         {
             return ((int)move >> 14) + PieceType.Knight;
+        }
+        public static string DebuggerDisplay(this Move move)
+        {
+            try
+            {
+                return UCI.Move(move);
+            }
+            catch
+            {
+                return "Invalid move: " + move;
+            }
         }
     }
 
