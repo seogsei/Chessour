@@ -373,25 +373,11 @@ namespace Chessour.Search
                         bestMove = move;
 
                         if (IsPV() && !IsRoot())
-                        {
                             UpdatePV(pv, move, childPv);
-                        }
                         if (score >= beta)
-                        {
                             break;
-                        }
                         else
-                        {
                             alpha = score;
-
-                            if (depth > 1
-                                && depth < 6
-                                && beta < ExpectedWin
-                                && alpha > -ExpectedWin)
-                                depth -= 1;
-
-                            Debug.Assert(depth > 0);
-                        }
                     }
                 }
             }
@@ -419,9 +405,7 @@ namespace Chessour.Search
                 return DrawValue;
 
             //Check if the alpha and beta values are within acceptable values
-            Debug.Assert(-Infinite <= alpha);
-            Debug.Assert(alpha < beta);
-            Debug.Assert(beta <= Infinite);
+            Debug.Assert(-Infinite <= alpha && alpha < beta && beta <= Infinite);
 
             //This is a pv node or we are in a aspiration search
             Debug.Assert(IsPV() || alpha == beta - 1);
@@ -554,7 +538,6 @@ namespace Chessour.Search
 
                         if (IsPV())
                             UpdatePV(pv, move, childPV);
-
                         if (score < beta)
                             alpha = score;
                         else
@@ -588,9 +571,11 @@ namespace Chessour.Search
         {
             int i = 0, j = 0;
             pv[i++] = move;
-
-            for (; childPv[j] != Move.None; i++, j++)
-                pv[i] = childPv[j];
+            if(childPv.Length > 0)
+                while (childPv[j] != Move.None)
+                {
+                    pv[i++] = childPv[j++];
+                }
 
             pv[i] = Move.None;
         }

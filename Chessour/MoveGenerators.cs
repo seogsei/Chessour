@@ -1,9 +1,7 @@
 ﻿using Chessour.Search;
-using System.ComponentModel.Design;
-using System.Diagnostics.SymbolStore;
-using System.Runtime.Intrinsics.X86;
 using static Chessour.Bitboards;
-using static Chessour.GenerationTypes;
+using static Chessour.Color;
+using static Chessour.PieceType;
 using static Chessour.MoveExtensions;
 
 namespace Chessour
@@ -68,93 +66,87 @@ namespace Chessour
                                                            : Black(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> White(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.White;
-                Square ksq = position.WhiteKingSquare();
+                const Color Us = Color.White;
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
-                Bitboard targetSquares = ~position.Whites();
+                Bitboard targetSquares = ~position.Pieces(Us);
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                    if (position.CanCastle(ourSide))
                     {
-                        MoveScore* ptr = fix;
+                        CastlingRight kingSide = ourSide & CastlingRight.KingSide;
+                        if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
-                        ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        CastlingRight ourSide = us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
-                        if (position.CanCastle(ourSide))
-                        {
-                            CastlingRight kingSide = ourSide & CastlingRight.KingSide;
-                            if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
-
-                            CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
-                            if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
-                        }
-
-                        int movesGenerated = (int)(ptr - fix);
-
-                        return buffer[..movesGenerated];
+                        CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
+                        if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                     }
-                }
+
+                    int movesGenerated = (int)(ptr - fix);
+
+                    return buffer[..movesGenerated];
+                }          
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.Black;
-                Square ksq = position.BlackKingSquare();
+                const Color Us = Color.Black;
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
-                Bitboard targetSquares = ~position.Blacks();
+                Bitboard targetSquares = ~position.Pieces(Us);
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                    if (position.CanCastle(ourSide))
                     {
-                        MoveScore* ptr = fix;
+                        CastlingRight kingSide = ourSide & CastlingRight.KingSide;
+                        if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
-                        ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        CastlingRight ourSide = us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
-                        if (position.CanCastle(ourSide))
-                        {
-                            CastlingRight kingSide = ourSide & CastlingRight.KingSide;
-                            if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
-
-                            CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
-                            if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
-                        }
-
-                        int movesGenerated = (int)(ptr - fix);
-
-                        return buffer[..movesGenerated];
+                        CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
+                        if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                     }
+
+                    int movesGenerated = (int)(ptr - fix);
+
+                    return buffer[..movesGenerated];
                 }
             }
 
@@ -183,10 +175,10 @@ namespace Chessour
                 const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
-                Bitboard enemies = position.Blacks();
+                Bitboard enemies = position.Pieces(Enemy);
 
-                Bitboard pawns = position.WhitePawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.WhitePawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftNorth() & emptySquares;
@@ -251,10 +243,10 @@ namespace Chessour
                 const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
-                Bitboard enemies = position.Whites();
+                Bitboard enemies = position.Pieces(Enemy);
 
-                Bitboard pawns = position.BlackPawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.BlackPawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftSouth() & emptySquares;
@@ -315,75 +307,69 @@ namespace Chessour
                                                             : Black(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> White(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.White;
+                const Color Us = Color.White;
                 
-                Square ksq = position.WhiteKingSquare();
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
                 Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    if (!position.Checkers.MoreThanOne())
                     {
-                        MoveScore* ptr = fix;
-
-                        if (!position.Checkers.MoreThanOne())
-                        {
-                            ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
-                            ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
-                            ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
-                            ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
-                            ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
-                        }
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(us);
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        int movesGenerated = (int)(ptr - fix);
-                        return buffer[..movesGenerated];
+                        ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
+                        ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
+                        ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
+                        ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
+                        ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
                     }
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    int movesGenerated = (int)(ptr - fix);
+                    return buffer[..movesGenerated];
                 }
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.Black;
+                const Color Us = Color.Black;
 
-                Square ksq = position.BlackKingSquare();
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
                 Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
-
-                unsafe
+                
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    if (!position.Checkers.MoreThanOne())
                     {
-                        MoveScore* ptr = fix;
-
-                        if (!position.Checkers.MoreThanOne())
-                        {
-                            ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
-                            ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
-                            ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
-                            ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
-                            ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
-                        }
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(us);
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        int movesGenerated = (int)(ptr - fix);
-                        return buffer[..movesGenerated];
+                        ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
+                        ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
+                        ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
+                        ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
+                        ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
                     }
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    int movesGenerated = (int)(ptr - fix);
+                    return buffer[..movesGenerated];
                 }
             }
 
@@ -414,8 +400,8 @@ namespace Chessour
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Checkers;
 
-                Bitboard pawns = position.WhitePawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.WhitePawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftNorth() & emptySquares;
@@ -490,8 +476,8 @@ namespace Chessour
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Checkers;
 
-                Bitboard pawns = position.BlackPawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.BlackPawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftSouth() & emptySquares;
@@ -560,63 +546,60 @@ namespace Chessour
                                                            : Black(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private unsafe static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.White;
-                Square ksq = position.WhiteKingSquare();
+                const Color Us = Color.White;
+                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
-                Bitboard targetSquares = position.Blacks();
+                Bitboard targetSquares = position.Pieces(Enemy);
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
-                    {
-                        MoveScore* ptr = fix;
+                    MoveScore* ptr = fix;
 
-                        ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
 
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
 
-                        return buffer[..(int)(ptr - fix)];
-                    }
+                    return buffer[..(int)(ptr - fix)];
                 }
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private unsafe static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.Black;
-                Square ksq = position.BlackKingSquare();
+                const Color Us = Color.Black;
+                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
-                Bitboard targetSquares = position.Whites();
+                Bitboard targetSquares = position.Pieces(Enemy);
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
-                    {
-                        MoveScore* ptr = fix;
+                    MoveScore* ptr = fix;
 
-                        ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
 
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
 
-                        return buffer[..(int)(ptr - fix)];
-                    }
+                    return buffer[..(int)(ptr - fix)];
                 }
             }
 
@@ -653,10 +636,10 @@ namespace Chessour
                 const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
-                Bitboard enemies = position.Blacks();
+                Bitboard enemies = position.Pieces(Enemy);
 
-                Bitboard pawns = position.WhitePawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.WhitePawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -711,10 +694,10 @@ namespace Chessour
                 const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
-                Bitboard enemies = position.Whites();
+                Bitboard enemies = position.Pieces(Enemy);
 
-                Bitboard pawns = position.BlackPawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.BlackPawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -759,99 +742,93 @@ namespace Chessour
         public static class Quiet
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
+            public static  Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
             {
                 return position.ActiveColor == Color.White ? White(position, buffer)
                                                            : Black(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> White(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.White;
-                Square ksq = position.WhiteKingSquare();
+                const Color Us = Color.White;
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
                 Bitboard targetSquares = ~position.Pieces();
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                    if (position.CanCastle(ourSide))
                     {
-                        MoveScore* ptr = fix;
+                        CastlingRight kingSide = ourSide & CastlingRight.KingSide;
+                        if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
-                        ptr = GenerateWhitePawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateWhiteBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateWhiteQueenMoves(position, targetSquares, occupancy, ptr);
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        CastlingRight ourSide = us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
-                        if (position.CanCastle(ourSide))
-                        {
-                            CastlingRight kingSide = ourSide & CastlingRight.KingSide;
-                            if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
-
-                            CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
-                            if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
-                        }
-
-                        int movesGenerated = (int)(ptr - fix);
-
-                        return buffer[..movesGenerated];
+                        CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
+                        if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                     }
+
+                    int movesGenerated = (int)(ptr - fix);
+
+                    return buffer[..movesGenerated];
                 }
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static unsafe Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
             {
-                const Color us = Color.Black;
-                Square ksq = position.BlackKingSquare();
+                const Color Us = Color.Black;
+                Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
                 Bitboard targetSquares = ~position.Pieces();
 
-                unsafe
+                fixed (MoveScore* fix = buffer)
                 {
-                    fixed (MoveScore* fix = buffer)
+                    MoveScore* ptr = fix;
+
+                    ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
+                    ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
+                    ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
+
+                    //King moves
+                    Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
+
+                    foreach (Square attack in kingAttacks)
+                        *ptr++ = CreateMove(ksq, attack);
+
+                    CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                    if (position.CanCastle(ourSide))
                     {
-                        MoveScore* ptr = fix;
+                        CastlingRight kingSide = ourSide & CastlingRight.KingSide;
+                        if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
-                        ptr = GenerateBlackPawnMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackKnightMoves(position, targetSquares, ptr);
-                        ptr = GenerateBlackBishopMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackRookMoves(position, targetSquares, occupancy, ptr);
-                        ptr = GenerateBlackQueenMoves(position, targetSquares, occupancy, ptr);
-
-                        //King moves
-                        Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
-
-                        foreach (Square attack in kingAttacks)
-                            *ptr++ = CreateMove(ksq, attack);
-
-                        CastlingRight ourSide = us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
-                        if (position.CanCastle(ourSide))
-                        {
-                            CastlingRight kingSide = ourSide & CastlingRight.KingSide;
-                            if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
-
-                            CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
-                            if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                                *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
-                        }
-
-                        int movesGenerated = (int)(ptr - fix);
-
-                        return buffer[..movesGenerated];
+                        CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
+                        if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
+                            *ptr++ = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                     }
+
+                    int movesGenerated = (int)(ptr - fix);
+
+                    return buffer[..movesGenerated];
                 }
             }
 
@@ -880,8 +857,8 @@ namespace Chessour
 
                 Bitboard emptySquares = ~position.Pieces();
 
-                Bitboard pawns = position.WhitePawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.WhitePawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftNorth() & emptySquares;
@@ -920,8 +897,8 @@ namespace Chessour
 
                 Bitboard emptySquares = ~position.Pieces();
 
-                Bitboard pawns = position.BlackPawns() & ~RelativeRank7;
-                Bitboard promotionPawns = position.BlackPawns() & RelativeRank7;
+                Bitboard pawns = position.Pieces(Us, Pawn) & ~RelativeRank7;
+                Bitboard promotionPawns = position.Pieces(Us, Pawn) & RelativeRank7;
 
                 //Pushes except promotions
                 Bitboard push1 = pawns.ShiftSouth() & emptySquares;
@@ -949,7 +926,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateWhiteKnightMoves(Position position, Bitboard targetSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.WhiteKnights())
+            foreach (Square pieceSquare in position.Pieces(White, Knight)) 
             {
                 Bitboard attacks = KnightAttacks(pieceSquare) & targetSquares;
 
@@ -962,7 +939,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateBlackKnightMoves(Position position, Bitboard targetSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.BlackKnights())
+            foreach (Square pieceSquare in position.Pieces(Black, Knight))
             {
                 Bitboard attacks = KnightAttacks(pieceSquare) & targetSquares;
 
@@ -975,7 +952,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateWhiteBishopMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.WhiteBishops())
+            foreach (Square pieceSquare in position.Pieces(White, Bishop))
             {
                 Bitboard attacks = BishopAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
@@ -988,7 +965,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateBlackBishopMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.BlackBishops())
+            foreach (Square pieceSquare in position.Pieces(Black, Bishop))
             {
                 Bitboard attacks = BishopAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
@@ -1001,7 +978,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateWhiteRookMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.WhiteRooks())
+            foreach (Square pieceSquare in position.Pieces(White, Rook))
             {
                 Bitboard attacks = RookAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
@@ -1014,7 +991,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateBlackRookMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.BlackRooks())
+            foreach (Square pieceSquare in position.Pieces(Black, Rook))
             {
                 Bitboard attacks = RookAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
@@ -1027,7 +1004,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateWhiteQueenMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.WhiteQueens())
+            foreach (Square pieceSquare in position.Pieces(White, Queen))
             {
                 Bitboard attacks = QueenAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
@@ -1040,7 +1017,7 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static unsafe MoveScore* GenerateBlackQueenMoves(Position position, Bitboard targetSquares, Bitboard occupiedSquares, MoveScore* pointer)
         {
-            foreach (Square pieceSquare in position.BlackQueens())
+            foreach (Square pieceSquare in position.Pieces(Black, Queen))
             {
                 Bitboard attacks = QueenAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
