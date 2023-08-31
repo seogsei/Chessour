@@ -37,12 +37,12 @@
         private static readonly ScoreTuple[,] pawnBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB]
         {
                 { new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0) },
-                { new(  2, -8), new(  4, -6), new( 11,  9), new( 18,  5), new( 16, 16), new( 21,  6), new(  9, -6), new( -3,-18) },
-                { new( -9, -9), new(-15, -7), new( 11,-10), new( 15,  5), new( 31,  2), new( 23,  3), new(  6, -8), new(-20, -5) },
-                { new( -3,  7), new(-20,  1), new(  8, -8), new( 19, -2), new( 39,-14), new( 17,-13), new(  2,-11), new( -5, -6) },
-                { new( 11, 12), new( -4,  6), new(-11,  2), new(  2, -6), new( 11, -5), new(  0, -4), new(-12, 14), new(  5,  9) },
-                { new(  3, 27), new(-11, 18), new( -6, 19), new( 22, 29), new( -8, 30), new( -5,  9), new(-14,  8), new(-11, 14) },
-                { new( -7, -1), new(  6,-14), new( -2, 13), new(-11, 22), new(  4, 24), new(-14, 17), new( 10,  7), new( -9,  7) },
+                { new(  5,  0), new( 10,  0), new( 10,  0), new(-20,  0), new(-20,  0), new( 10,  0), new( 10,  0), new(  5,  0) },
+                { new(  5,  0), new( -5,  0), new(-10,  0), new(  0,  0), new(  0,  0), new(-10,  0), new( -5,  0), new(  5,  0) },
+                { new(  0,  0), new(  0,  0), new(  0,  0), new( 20,  0), new( 20,  0), new(  0,  0), new(  0,  0), new(  0,  0) },
+                { new(  5,  0), new(  5,  0), new( 10,  0), new( 25,  0), new( 25,  0), new( 10,  0), new(  5,  0), new(  5,  0) },
+                { new( 10,  0), new( 10,  0), new( 20,  0), new( 30,  0), new( 30,  0), new( 20,  0), new( 10,  0), new( 10,  0) },
+                { new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0) },
                 { new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0) },
         };
         

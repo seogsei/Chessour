@@ -713,32 +713,14 @@ namespace Chessour
 
             CapturedPiece = captured;
             Checkers = givesCheck ? AttackersTo(KingSquare(them)) & Pieces(us) : 0;
-            
+
             ActiveColor = them;
-            PositionKey = key ^= Zobrist.SideKey();
+            PositionKey = key ^ Zobrist.SideKey();
 
             SetCheckInfo(state);
 
             //Repetition info
-            Repetition = 0;
-            int plies = Math.Min(FiftyMoveCounter, PliesFromNull);
-
-            //It requires atleast 4 plies to repeat
-            if (plies >= 4)
-            {
-                StateInfo repeatCandidate = state.Previous.Previous!;
-
-                for (int i = 4; i < plies; i += 2)
-                {
-                    repeatCandidate = repeatCandidate.Previous!.Previous!;
-
-                    if (key == repeatCandidate.PositionKey)
-                    {
-                        Repetition = repeatCandidate.Repetition + 1;
-                        break;
-                    }
-                }
-            }
+            Repetition = CalculateRepetition();
 
             Debug.Assert(PositionKey == CalculatePositionKey(),
                 $""""
@@ -746,6 +728,26 @@ namespace Chessour
                 Expected:   {CalculatePositionKey()}
                 Last Move: {UCI.Move(move)}
                 """");
+        }
+
+        private int CalculateRepetition(int plyLimit = int.MaxValue)
+        {
+            int pliesToCheck = Math.Min(plyLimit, Math.Min(FiftyMoveCounter, PliesFromNull));
+
+            //It requires atleast 4 plies to repeat
+            if (pliesToCheck < 4)
+                return 0;
+
+            StateInfo repeatCandidate = state.Previous!.Previous!;
+            for (int i = 4; i <= pliesToCheck; i += 2)
+            {
+                repeatCandidate = repeatCandidate.Previous!.Previous!;
+
+                if (PositionKey == repeatCandidate.PositionKey)
+                    return repeatCandidate.Repetition + 1;
+            }
+
+            return 0;
         }
 
         public void MakeNullMove(StateInfo newSt)
@@ -847,20 +849,7 @@ namespace Chessour
         //Did this position happen in this many moves?
         public bool HasRepeated(int ply)
         {
-            if (ply < 4) 
-                return false;
-
-            Key positionKey = state.PositionKey;
-            StateInfo repeatCandidate = state.Previous!.Previous!;
-
-            for(int i = 4; i < ply; i += 2)
-            {
-                repeatCandidate = repeatCandidate.Previous!.Previous!;
-
-                if (positionKey == repeatCandidate.PositionKey)
-                    return true;
-            }
-            return false;
+            return CalculateRepetition(ply) > 0;
         }
 
         private (Bitboard, Bitboard) SliderBlockers(Bitboard sliders, Square target)
@@ -992,8 +981,9 @@ namespace Chessour
             sb.AppendLine("   a   b   c   d   e   f   g   h");
             sb.AppendLine();
 
-            sb.Append("Fen: ").Append(FEN()).AppendLine();
-            sb.Append("Key: ").Append(PositionKey.ToString("X")).AppendLine();
+            sb.Append("Fen: ").AppendLine(FEN());
+            sb.Append("Key: ").AppendLine(PositionKey.ToString("X"));
+            sb.Append("Repetition: ").AppendLine(Repetition.ToString());
             return sb.ToString();
         }
 

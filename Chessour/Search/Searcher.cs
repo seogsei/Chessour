@@ -1,4 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using Chessour.Evaluation;
+using System.Collections.Generic;
+using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
 using static Chessour.Engine;
 using static Chessour.Evaluation.Evaluator;
@@ -27,13 +29,13 @@ namespace Chessour.Search
         private readonly Position position;
         private readonly Position.StateInfo rootState;
         private readonly Position.StateInfo[] states;
-
-        private int rootDepth;
+        
         private int completedDepth;
         private int selectiveDepth;
 
         public bool SendInfo { get; set; }
         public ulong NodeCount { get; set; }
+        public int RootDepth { get; private set; }
 
         public void SetSearchParameters(Position position, List<Move>? moves)
         {
@@ -51,6 +53,7 @@ namespace Chessour.Search
         public void ResetSearchStats()
         {
             completedDepth = selectiveDepth = 0;
+            RootDepth = 0;
             NodeCount = 0;
         }
 
@@ -129,41 +132,60 @@ namespace Chessour.Search
             Span<SearchStack> stack = stackalloc SearchStack[MAX_PLY];
 
             int bestValue = -Infinite;
-            int alpha = -Infinite;
-            int beta = Infinite;
 
             int maxPvIdx = Math.Min(1, rootMoves.Count);
 
-            for (rootDepth = 1; rootDepth < DepthConstants.Max; rootDepth++)
+            while(++RootDepth < MaxDepth
+                && !Stop
+                && !(SearchLimits.Depth > 0 && RootDepth > SearchLimits.Depth))
             {
-                if (Stop)
-                    break;
-
-                if (SearchLimits.Mate > 0 && rootDepth > SearchLimits.Mate)
-                    break;
-
                 foreach (var rootMove in rootMoves)
                     rootMove.PreviousScore = rootMove.Score;
 
-                for (int pvIdx = 0; pvIdx < maxPvIdx; pvIdx++)
+                for (int pvIdx = 0; pvIdx < maxPvIdx && !Stop; pvIdx++)
                 {
                     selectiveDepth = 0;
 
-                    bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, rootDepth);
+                    int previousScore = rootMoves[pvIdx].PreviousScore;
+                    int delta = Pieces.PawnValue + previousScore * previousScore / 4096;
+                    int alpha =  Math.Max(previousScore - delta, -Infinite);
+                    int beta = Math.Min(previousScore + delta, +Infinite);
 
-                    rootMoves.Sort(pvIdx);
-
-                    if (Stop)
-                        break;
-
-                    if (SendInfo && !Stop)
+                    while (true) 
                     {
-                        UCI.SendPV(this, rootDepth);
+                        bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, RootDepth);
+
+                        rootMoves.Sort(pvIdx);
+
+                        if (Stop)
+                            break;
+
+                        if (bestValue <= alpha) //Fail low
+                        {
+                            Console.WriteLine("Fail Low");
+                            alpha = Math.Max(bestValue - delta, -Infinite);
+                        }
+                        else if (bestValue >= beta) //Fail high
+                        {
+                            Console.WriteLine("Fail High");
+                            beta = Math.Min(bestValue + delta, Infinite);
+                        }
+                        else
+                            break;
+
+                        delta = beta - alpha;
+                        Debug.Assert(-Infinite <= alpha && beta <= Infinite);
+                    }
+
+                    if (SendInfo
+                        && (Stop || pvIdx + 1 == maxPvIdx))
+                    {
+                        UCI.SendPV(this, RootDepth);
                     }
                 }
 
                 if (!Stop)
-                    completedDepth = rootDepth;
+                    completedDepth = RootDepth;
 
                 if (SearchLimits.Mate > 0
                     && bestValue >= MateValue
@@ -181,8 +203,15 @@ namespace Chessour.Search
             if (depth <= 0)
                 return QuiescenceSearch(nodeType, stack, ply, alpha, beta, 0, pv);
 
-            if (position.IsDraw())
-                return DrawValue;
+            if (position.FiftyMoveCounter >= 3
+                && alpha < DrawValue
+                && position.HasRepeated(ply))
+            {
+                alpha = DrawValue;
+
+                if (alpha >= beta)
+                    return alpha;
+            }
 
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha);
@@ -214,8 +243,9 @@ namespace Chessour.Search
 
             if (!IsRoot())
             {
-                if (Stop)
-                    return 0;
+                if (Stop
+                    || position.IsDraw())
+                    return DrawValue;
 
                 if (ply >= MAX_PLY)
                     return inCheck ? DrawValue
@@ -261,10 +291,10 @@ namespace Chessour.Search
                 }
 
                 if (!IsPV())
-                {
+                {                  
                     //Futility Pruning
-                    if (depth < 5
-                        && evaluation >= beta
+                    if (depth < 7
+                        && evaluation - 1000 >= beta
                         && evaluation < ExpectedWin + 1)
                         return evaluation;
 
@@ -278,7 +308,9 @@ namespace Chessour.Search
 
                         NodeCount++;
                         position.MakeNullMove(state);
-                        int nullScore = -NodeSearch(NodeType.NonPV, stack, ply + 1, -beta, -alpha, depth - R);
+
+                        int nullScore = -NodeSearch(NodeType.NonPV, stack, ply + 1, -beta, -beta + 1, depth - R);
+
                         position.TakebackNullMove();
 
                         if (nullScore >= beta)
@@ -295,26 +327,45 @@ namespace Chessour.Search
             int nextPly = ply + 1;
             foreach (Move move in movePicker)
             {
-                if (IsRoot())
-                {
-                    if (!rootMoves.Contains(move))
-                        continue;
-                }
-                else if (!position.IsLegal(move))
+                if (IsRoot() && !rootMoves.Contains(move))
+                    continue;
+
+                if (!IsRoot() && !position.IsLegal(move))
                     continue;
 
                 moveCount++;
                 stack[ply].currentMove = move;
                 bool givesCheck = position.GivesCheck(move);
+                bool isCapture = position.IsCapture(move);
+
+
+                int newDepth = depth - 1;
+
+                int extensions = 0;
+
+                if (ply + depth < RootDepth * 2)
+                {
+                    if (givesCheck)
+                        extensions = 1;
+                }
+
+                newDepth += extensions;
+
+                int R = 0;
+                if (!IsPV() || moveCount > 1)
+                {
+                    if (moveCount > 6)
+                        R++;
+                    if (isCapture && !position.StaticExchangeEvaluationGE(move))
+                        R++;
+                }
 
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                int newDepth = depth - 1;
-
                 if (!IsPV() || moveCount > 1)
                 {
-                    score = -NodeSearch(NodeType.NonPV, stack, nextPly, -(alpha + 1), -alpha, newDepth);
+                    score = -NodeSearch(NodeType.NonPV, stack, nextPly, -(alpha + 1), -alpha, newDepth - R);
                 }
 
                 if (IsPV() && (moveCount == 1 || (score > alpha)))
@@ -377,7 +428,17 @@ namespace Chessour.Search
                         if (score >= beta)
                             break;
                         else
+                        {
                             alpha = score;
+
+                            if (depth > 1
+                                && depth < 6
+                                && beta < ExpectedWin
+                                && score > ExpectedLoss)
+                                depth--;
+
+                            Debug.Assert(depth > 0);
+                        }
                     }
                 }
             }
@@ -401,17 +462,17 @@ namespace Chessour.Search
         {
             bool IsPV() => nodeType != NodeType.NonPV;
 
-            if (position.IsDraw())
-                return DrawValue;
-
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha && alpha < beta && beta <= Infinite);
-
             //This is a pv node or we are in a aspiration search
             Debug.Assert(IsPV() || alpha == beta - 1);
-
             //Depth is negative
             Debug.Assert(depth <= 0 && depth > TTOffset);
+
+            //Check for aborted search or draws
+            if (Stop
+                || position.IsDraw())
+                return DrawValue;
 
             //Check to see if this position repeated during search
             //If yes we can claim this position as Draw
@@ -423,6 +484,13 @@ namespace Chessour.Search
                 if (alpha >= beta)
                     return alpha;
             }
+            
+            //Mate distance pruning
+            alpha = Math.Max(MatedIn(ply), alpha);
+            beta = Math.Min(MateIn(ply), beta);
+
+            if (alpha >= beta)
+                return alpha;
 
             Span<Move> childPV = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[ply];
@@ -539,7 +607,17 @@ namespace Chessour.Search
                         if (IsPV())
                             UpdatePV(pv, move, childPV);
                         if (score < beta)
+                        {
                             alpha = score;
+
+                            if (depth > 1
+                                && depth < 6
+                                && beta < ExpectedWin
+                                && score > ExpectedLoss)
+                                depth--;
+
+                            Debug.Assert(depth > 0);
+                        }
                         else
                             break;   //Fail high                    
                     }

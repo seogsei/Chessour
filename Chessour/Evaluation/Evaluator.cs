@@ -9,7 +9,7 @@ namespace Chessour.Evaluation
     {
         public const int DrawValue = 0;
 
-        public const int ExpectedWin = 10000;
+        public const int ExpectedWin = 25000;
         public const int ExpectedLoss = -ExpectedWin;
 
         public const int MateValue = 32000;
@@ -17,6 +17,8 @@ namespace Chessour.Evaluation
 
         public const int MateInMaxPly = MateValue - DepthConstants.MAX_PLY;
         public const int MatedInMaxPly = -MateInMaxPly;
+
+        public const int Tempo = 15;
 
         public static int MatedIn(int ply)
         {
@@ -37,17 +39,19 @@ namespace Chessour.Evaluation
         {
             Debug.Assert(!position.IsCheck());
 
+            Color us = position.ActiveColor;
+            Color enemy = us.Flip();
+
             ScoreTuple score = Material(position, trace);
 
-            score += PieceMobility(White, position, trace) - PieceMobility(Black, position, trace);
+            score += PieceMobility(us, position, trace) - PieceMobility(enemy, position, trace);
 
-            int result = TaperedEval(score, position, trace);
-            return position.ActiveColor == White ? result : -result;
+            return TaperedEval(score, position, trace) + Tempo;
         }
 
         private static ScoreTuple Material(Position position, Trace? trace)
         {
-            ScoreTuple score = position.PSQScore;
+            ScoreTuple score = position.ActiveColor == White ? position.PSQScore : -position.PSQScore;
 
             trace?.Set(Trace.Term.Material, White, position.PSQScore);
 
