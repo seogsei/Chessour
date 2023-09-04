@@ -1,15 +1,15 @@
 ﻿namespace Chessour.Utilities
 {
-    internal ref struct UCIStream
+    internal ref struct StringStream
     {
         private readonly ReadOnlySpan<char> str;
         private int position;
 
-        public UCIStream(string str) : this(str.AsSpan())
+        public StringStream(string str) : this(str.AsSpan())
         {
 
         }
-        public UCIStream(ReadOnlySpan<char> str)
+        public StringStream(ReadOnlySpan<char> str)
         {
             this.str = str;
             position = 0;

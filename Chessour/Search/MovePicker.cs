@@ -119,7 +119,8 @@ namespace Chessour.Search
                     {
                         Move move = buffer[i].Move;
                         buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()))
-                                        - Pieces.PieceValue(position.PieceAt(move.OriginSquare()));
+                                        - Pieces.PieceValue(position.PieceAt(move.OriginSquare()))
+                                        + (move.Type() == MoveType.Promotion ? Pieces.PieceValue(move.PromotionPiece()) : 0);
                     }
                     return;
                 case Quiets:
@@ -129,7 +130,7 @@ namespace Chessour.Search
                         Piece piece = position.PieceAt(move.OriginSquare());
                         buffer[i].Score = PSQT.Get(piece, move.DestinationSquare()).MidGame
                                         - PSQT.Get(piece, move.OriginSquare()).MidGame
-                                        + move.Type() == MoveType.Promotion ? Pieces.QueenValue : 0;
+                                        + (move.Type() == MoveType.Promotion ? Pieces.PieceValue(move.PromotionPiece()) : 0);
                     }
                     return;
             }

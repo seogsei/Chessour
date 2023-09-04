@@ -2,11 +2,11 @@
 {
     internal static class Pieces
     {
-        public const int PawnValue = 100;
-        public const int KnightValue = 300;
-        public const int BishopValue = 310;
-        public const int RookValue = 500;
-        public const int QueenValue = 900;
+        public const int PawnValue = 198;
+        public const int KnightValue = 458;
+        public const int BishopValue = 500;
+        public const int RookValue = 844;
+        public const int QueenValue = 1560;
 
         public static ScoreTuple Pawn { get; } = new(100, 198);
         public static ScoreTuple Knight { get; } = new(305, 458);

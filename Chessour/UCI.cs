@@ -27,7 +27,7 @@ namespace Chessour
             string command;
             do
             {
-                UCIStream ss = args.Length == 0 ? new(Console.ReadLine() ?? "quit")
+                StringStream ss = args.Length == 0 ? new(Console.ReadLine() ?? "quit")
                                                    : new(string.Join(' ', args));
 
                 ss.SkipWhiteSpace();
@@ -76,7 +76,7 @@ namespace Chessour
             } while (command != "quit" && args.Length == 0);
         }
 
-        private void Position(ref UCIStream ss)
+        private void Position(ref StringStream ss)
         {
             ss.Extract(out string token);
 
@@ -104,7 +104,7 @@ namespace Chessour
             }
         }
 
-        private void Go(ref UCIStream ss)
+        private void Go(ref StringStream ss)
         {
             GoParameters limits = new()
             {
@@ -171,7 +171,7 @@ namespace Chessour
             Console.WriteLine(trace);
         }
 
-        private void Bench(ref UCIStream ss)
+        private void Bench(ref StringStream ss)
         {
             ulong nodes = 0;
 
@@ -198,7 +198,7 @@ namespace Chessour
                 """);
         }
 
-        private void SetOption(ref UCIStream ss)
+        private void SetOption(ref StringStream ss)
         {
 
         }
