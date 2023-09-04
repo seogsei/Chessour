@@ -2,17 +2,17 @@
 {
     internal static class Pieces
     {
-        public const int PawnValue = 198;
-        public const int KnightValue = 458;
-        public const int BishopValue = 500;
-        public const int RookValue = 844;
-        public const int QueenValue = 1560;
+        public const int PawnValue = 200;
+        public const int KnightValue = 640;
+        public const int BishopValue = 666;
+        public const int RookValue = 1020;
+        public const int QueenValue = 1760;
 
-        public static ScoreTuple Pawn { get; } = new(100, 198);
-        public static ScoreTuple Knight { get; } = new(305, 458);
-        public static ScoreTuple Bishop { get; } = new(333, 500);
-        public static ScoreTuple Rook { get; } = new(563, 844);
-        public static ScoreTuple Queen { get; } = new(950, 1560);
+        public static ScoreTuple Pawn { get; } = new(PawnValue, 200);
+        public static ScoreTuple Knight { get; } = new(KnightValue, 640);
+        public static ScoreTuple Bishop { get; } = new(BishopValue, 666);
+        public static ScoreTuple Rook { get; } = new(RookValue, 1020);
+        public static ScoreTuple Queen { get; } = new(QueenValue, 1760);
 
         private static readonly int[] pieceValues = new int[(int)Piece.NB]
         {

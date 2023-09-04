@@ -18,7 +18,7 @@ namespace Chessour.Evaluation
         public const int MateInMaxPly = MateValue - DepthConstants.MAX_PLY;
         public const int MatedInMaxPly = -MateInMaxPly;
 
-        public const int Tempo = 15;
+        public const int Tempo = 40;
 
         public static int MatedIn(int ply)
         {
@@ -68,7 +68,7 @@ namespace Chessour.Evaluation
 
             Square ksq = pos.KingSquare(side);
 
-            for (PieceType pt = PieceType.Knight; pt < PieceType.King; pt++)
+            for (PieceType pt = PieceType.Knight; pt < PieceType.Queen; pt++)
             {
                 Bitboard pieces = pos.Pieces(side, pt);
 
