@@ -11,9 +11,9 @@ namespace Chessour.Search
 
         public MasterThread Master => (MasterThread)this[0];
 
-        public ulong TotalNodesSearched()
+        public long TotalNodesSearched()
         {
-            ulong total = 0;
+            long total = 0;
             foreach (var thread in this)
                 total += thread.searcher.NodeCount;
 

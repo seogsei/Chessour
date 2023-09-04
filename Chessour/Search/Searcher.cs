@@ -1,4 +1,5 @@
 ﻿using Chessour.Evaluation;
+using System.Collections;
 using System.Collections.Generic;
 using System.Numerics;
 using System.Security.Cryptography.X509Certificates;
@@ -34,7 +35,7 @@ namespace Chessour.Search
         private int selectiveDepth;
 
         public bool SendInfo { get; set; }
-        public ulong NodeCount { get; set; }
+        public long NodeCount { get; set; }
         public int RootDepth { get; private set; }
 
         public void SetSearchParameters(Position position, List<Move>? moves)
@@ -57,69 +58,33 @@ namespace Chessour.Search
             NodeCount = 0;
         }
 
-        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2014:Do not use stackalloc in loops", Justification = "Its fine")]
-        public ulong Perft(int depth)
+        public long Perft(int depth)
         {
-            ulong totalNodes = 0, branchNodes;
-            var state = states[0];
-
-            if(depth > 2)
-            {
-                foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]))
-                {
-                    position.MakeMove(move, state);
-                    totalNodes += branchNodes = Perft(depth - 1, 1);
-                    position.Takeback(move);
-
-                    Console.WriteLine($"{UCI.Move(move)}: {branchNodes}");
-                }
-            }
-            else if(depth == 2)
-            {
-                foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]))
-                {
-                    position.MakeMove(move, state);
-                    totalNodes += branchNodes = (ulong)MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]).Length;
-                    position.Takeback(move);
-
-                    Console.WriteLine($"{UCI.Move(move)}: {branchNodes}");
-                }
-            }
-            else
-            {
-                foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]))
-                {
-                    totalNodes++;
-
-                    Console.WriteLine($"{UCI.Move(move)}: 1");
-                }
-            }
-
-            return NodeCount = totalNodes;
+            return NodeCount = Perft(depth, 0);
         }
 
-        protected ulong Perft(int depth, int distance)
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Reliability", "CA2014:Do not use stackalloc in loops", Justification = "")]
+        protected long Perft(int depth, int distance)
         {
-            ulong totalNodes = 0;
+            long totalNodes = 0, branchNodes;
             var state = states[distance];         
 
-            if(depth != 2)
+            foreach(Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]))
             {
-                foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]))
+                if (depth == 1)
+                    totalNodes += branchNodes = 1;
+
+                else
                 {
                     position.MakeMove(move, state);
-                    totalNodes += Perft(depth - 1, distance + 1);
+                    branchNodes = depth == 2 ? MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length
+                                             : Perft(depth - 1, distance + 1);
+                    totalNodes += branchNodes;
                     position.Takeback(move);
                 }
-            }
-            else
-            {
-                foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]))
-                {
-                    position.MakeMove(move, state);
-                    totalNodes += (ulong)MoveGenerators.Legal.Generate(position, stackalloc MoveScore[256]).Length;
-                    position.Takeback(move);
-                }
+
+                if (distance == 0)
+                    Console.WriteLine($"{UCI.Move(move)}: {branchNodes}");
             }
 
             return totalNodes;
@@ -153,7 +118,8 @@ namespace Chessour.Search
 
                     while (true) 
                     {
-                        bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, RootDepth);
+                        //bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, RootDepth);
+                        bestValue = RootSearch(stack, alpha, beta, RootDepth);
 
                         rootMoves.Sort(pvIdx);
 
@@ -162,12 +128,10 @@ namespace Chessour.Search
 
                         if (bestValue <= alpha) //Fail low
                         {
-                            Console.WriteLine("Fail Low");
                             alpha = Math.Max(bestValue - delta, -Infinite);
                         }
                         else if (bestValue >= beta) //Fail high
                         {
-                            Console.WriteLine("Fail High");
                             beta = Math.Min(bestValue + delta, Infinite);
                         }
                         else
@@ -197,11 +161,153 @@ namespace Chessour.Search
             }
         }
 
-        private int NodeSearch(NodeType nodeType, Span<SearchStack> stack, int ply, int alpha, int beta, int depth, Span<Move> pv = default)
+        private int RootSearch(Span<SearchStack> stack, int alpha, int beta, int depth)
+        {
+            //Check if the alpha and beta values are within acceptable values
+            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(alpha < beta);
+            Debug.Assert(beta <= Infinite);
+
+            //Check to see if depth values are in allowed range
+            Debug.Assert(depth > 0 && depth < MAX_DEPTH);
+
+            int score = -Infinite;
+            int evaluation = -Infinite;
+            Span<Move> childPv = stackalloc Move[MAX_PLY];
+            Position.StateInfo state = states[0];
+            bool inCheck = stack[0].inCheck = position.IsCheck();
+            
+            selectiveDepth = 1;
+
+            if (inCheck)
+                evaluation = stack[0].evaluation = -Infinite;
+            else
+                evaluation = stack[0].evaluation = Evaluate(position);
+
+            int moveCount = 0;
+            foreach (var rootMove in rootMoves)
+            {
+                Move move = rootMove.Move;
+
+                moveCount++;
+                stack[0].currentMove = move;
+                bool givesCheck = position.GivesCheck(move);
+                bool isCapture = position.IsCapture(move);
+
+                int newDepth = depth - 1;
+
+                int extension = 0;
+
+                if (depth < RootDepth * 2)
+                {
+                    if (givesCheck)
+                        extension = 1;
+                }
+
+                newDepth += extension;
+
+                NodeCount++;
+                position.MakeMove(move, state, givesCheck);
+
+                if (moveCount > 1)
+                {
+                    int R = 0;
+                    if (moveCount > 6)
+                        R++;
+                    if (isCapture && !position.StaticExchangeEvaluationGE(move))
+                        R++;
+
+                    score = -ZWSearch(stack, 1, -(alpha + 1), newDepth - R);
+                }
+
+                if (moveCount == 1 || (score > alpha))
+                {
+                    childPv[0] = Move.None;                   
+                    score = -PVSearch( stack, 1, -beta, -alpha, newDepth, childPv);
+                }
+
+                position.Takeback(move);
+
+                if (Stop)
+                    return 0;
+
+                if (moveCount == 1 || score > alpha)
+                {
+                    rootMove.Score = rootMove.UCIScore = score;
+                    rootMove.SelectiveDepth = selectiveDepth;
+
+                    rootMove.BoundLower = rootMove.BoundUpper = false;
+
+                    if (score >= beta)
+                    {
+                        rootMove.BoundLower = true;
+                        rootMove.UCIScore = beta;
+                    }
+                    else if (score <= alpha)
+                    {
+                        rootMove.BoundUpper = true;
+                        rootMove.UCIScore = alpha;
+                    }
+
+                    rootMove.PV.Clear();
+                    rootMove.PV.Add(move);
+
+                    foreach (Move pvMove in childPv)
+                        if (pvMove != Move.None)
+                            rootMove.PV.Add(pvMove);
+                        else
+                            break;
+                }
+                else
+                    rootMove.Score = -Infinite;
+
+                if (score > alpha)
+                {
+                    alpha = score;
+
+                    if (alpha >= beta) //Fail high which means we need to research with a bigger aspiration window
+                        break;
+
+                    if (depth > 1
+                            && depth < 6
+                            && beta < ExpectedWin
+                            && score > ExpectedLoss)
+                        depth--;
+
+                    Debug.Assert(depth > 0);
+                }
+            }
+
+            return alpha;
+        }
+
+        private int PVSearch(Span<SearchStack> stack, int ply, int alpha, int beta, int depth, Span<Move> pv)
         {
             //If remainingDepth is equal or zero dive into Quisence Search
             if (depth <= 0)
-                return QuiescenceSearch(nodeType, stack, ply, alpha, beta, 0, pv);
+                return QuiescenceSearch(NodeType.PV, stack, ply, alpha, beta, 0, pv);
+
+            //Check if the alpha and beta values are within acceptable values
+            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(alpha < beta);
+            Debug.Assert(beta <= Infinite);
+
+            //Check to see if depth values are in allowed range
+            Debug.Assert(depth > 0 && depth < MAX_DEPTH);
+
+            int score = -Infinite;
+            int bestScore = -Infinite;
+            Move bestMove = Move.None;
+            Span<Move> childPv = stackalloc Move[MAX_PLY];
+            Position.StateInfo state = states[ply];
+            bool inCheck = stack[ply].inCheck = position.IsCheck();
+
+            selectiveDepth = Math.Max(selectiveDepth, ply + 1);
+
+            CheckTime();
+
+            if (Stop || position.IsDraw())
+                return DrawValue;
 
             if (position.FiftyMoveCounter >= 3
                 && alpha < DrawValue
@@ -212,6 +318,335 @@ namespace Chessour.Search
                 if (alpha >= beta)
                     return alpha;
             }
+
+            if (ply >= MAX_PLY)
+                return inCheck ? DrawValue : Evaluate(position);
+
+            //Mate distance pruning
+            alpha = Math.Max(MatedIn(ply), alpha);
+            beta = Math.Min(MateIn(ply + 1), beta);
+            if (alpha >= beta)
+                return alpha;
+
+            //Transposition table lookup
+            Key positionKey = position.PositionKey;
+            ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
+            int ttScore = 0;
+            Move ttMove = Move.None;
+            bool ttCapture = false;
+
+            stack[ply].ttHit = ttHit;
+            if (ttHit)
+            {
+                ttScore = ttentry.Evaluation;
+                ttMove = ttentry.Move;
+                ttCapture = ttMove != Move.None && position.IsCapture(ttMove);
+            }
+
+            int evaluation = 0;
+            if (inCheck)
+            {
+                evaluation = stack[ply].evaluation = -Infinite;
+            }
+            else
+            {
+                if (ttHit)
+                {
+                    evaluation = stack[ply].evaluation = ttentry.Evaluation;
+                }
+                else
+                {
+                    evaluation = stack[ply].evaluation = Evaluate(position);
+                }
+            }
+          
+            MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            int moveCount = 0;
+            int nextPly = ply + 1;
+            foreach (Move move in movePicker)
+            {
+                if (!position.IsLegal(move))
+                    continue;
+
+                moveCount++;
+                stack[ply].currentMove = move;
+                bool givesCheck = position.GivesCheck(move);
+                bool isCapture = position.IsCapture(move);
+
+                int newDepth = depth - 1;
+
+                int extensions = 0;
+                if (ply + depth < RootDepth * 2)
+                {
+                    if (givesCheck)
+                        extensions = 1;
+                }
+
+                newDepth += extensions;
+
+                NodeCount++;
+                position.MakeMove(move, state, givesCheck);
+
+                if (moveCount > 1)
+                {
+                    int R = 0;
+                    if (moveCount > 6)
+                        R++;
+                    if (isCapture && !position.StaticExchangeEvaluationGE(move))
+                        R++;
+
+                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
+                }
+
+                if (moveCount == 1 || (score > alpha))
+                {
+                    childPv[0] = Move.None;
+                    score = -PVSearch(stack, nextPly, -beta, -alpha, newDepth, childPv);
+                }
+
+                position.Takeback(move);
+
+                if (Stop)
+                    return 0;
+
+                Debug.Assert(score > -Infinite && score < Infinite);
+                
+                if (score > bestScore)
+                {
+                    bestScore = score;
+
+                    if (score > alpha)
+                    {
+                        bestMove = move;
+
+                        UpdatePV(pv, move, childPv);
+
+                        if (score >= beta)
+                            break;
+                        else
+                        {
+                            alpha = score;
+
+                            if (depth > 1
+                                && depth < 6
+                                && beta < ExpectedWin
+                                && score > ExpectedLoss)
+                                depth--;
+
+                            Debug.Assert(depth > 0);
+                        }
+                    }
+                }
+            }
+
+            //If there is no legal moves in the position we are either mated or its stealmate
+            if (moveCount == 0)
+            {
+                bestScore = inCheck ? MatedIn(ply)
+                                    : DrawValue;
+            }
+
+            ttentry.Save(positionKey, true, bestMove, depth,
+                bestScore >= beta ? Bound.Lower
+                                  : bestMove != Move.None ? Bound.Exact
+                                                          : Bound.Upper, bestScore);
+
+            return bestScore;
+        }
+
+        private int ZWSearch(Span<SearchStack> stack, int ply, int alpha, int depth)
+        {
+            int beta = alpha + 1;
+
+            //If remainingDepth is equal or zero dive into Quisence Search
+            if (depth <= 0)
+                return QuiescenceSearch(NodeType.NonPV, stack, ply, alpha, beta);
+
+            //Check if the alpha and beta values are within acceptable values
+            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(alpha < beta);
+            Debug.Assert(beta <= Infinite);
+
+            //Check to see if depth values are in allowed range
+            Debug.Assert(depth > 0 && depth < MAX_DEPTH);
+
+            int score = -Infinite;
+            int bestScore = -Infinite;
+            Move bestMove = Move.None;
+            Span<Move> childPv = stackalloc Move[MAX_PLY];
+            Position.StateInfo state = states[ply];
+            bool inCheck = stack[ply].inCheck = position.IsCheck();
+
+            CheckTime();
+
+            if (Stop || position.IsDraw())
+                return DrawValue;
+
+            if (position.FiftyMoveCounter >= 3
+                && alpha < DrawValue
+                && position.HasRepeated(ply))
+            {
+                alpha = DrawValue;
+
+                if (alpha >= beta)
+                    return alpha;
+            }
+
+            if (ply >= MAX_PLY)
+                return inCheck ? DrawValue : Evaluate(position);
+
+            //Mate distance pruning
+            alpha = Math.Max(MatedIn(ply), alpha);
+            beta = Math.Min(MateIn(ply + 1), beta);
+            if (alpha >= beta)
+                return alpha;
+
+            //Transposition table lookup
+            Key positionKey = position.PositionKey;
+            ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
+            
+            stack[ply].ttHit = ttHit;
+
+            int ttEval = ttHit ? ttentry.Evaluation : 0;
+            Move ttMove = ttHit ? ttentry.Move : Move.None;
+            bool ttCapture = ttMove != Move.None && position.IsCapture(ttMove);
+
+            int evaluation = 0;
+
+            if (inCheck)
+            {
+                evaluation = stack[ply].evaluation = -Infinite;
+                goto movesLoop;
+            }
+
+            if (ttHit)
+            {
+                evaluation = stack[ply].evaluation = ttentry.Evaluation;
+            }
+            else
+            {
+                evaluation = stack[ply].evaluation = Evaluate(position);
+            }
+
+            //Futility Pruning
+            if (depth < 7
+                && evaluation - 5000 >= beta
+                && evaluation < ExpectedWin + 1)
+                return evaluation;
+
+            //Null move reduction
+            if (stack[ply - 1].currentMove != Move.Null
+                && evaluation >= beta)
+            {
+                int R = (depth / 4) + 3;
+
+                stack[ply].currentMove = Move.Null;
+
+                position.MakeNullMove(state);
+
+                int nullScore = -ZWSearch(stack, ply + 1, -beta, depth - R);
+
+                position.TakebackNullMove();
+
+                if (nullScore >= beta)
+                {
+                    depth -= 4;
+                }
+            }
+
+            movesLoop:
+
+            MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            int moveCount = 0;
+            int nextPly = ply + 1;
+            foreach (Move move in movePicker)
+            {
+                if (!position.IsLegal(move))
+                    continue;
+
+                moveCount++;
+                stack[ply].currentMove = move;
+                bool givesCheck = position.GivesCheck(move);
+                bool isCapture = position.IsCapture(move);
+
+                int newDepth = depth - 1;
+
+                int extensions = 0;
+
+                if (ply + depth < RootDepth * 2)
+                {
+                    if (givesCheck)
+                        extensions = 1;
+                }
+
+                newDepth += extensions;
+
+                NodeCount++;
+                position.MakeMove(move, state, givesCheck);
+
+                int R = 0;
+                if (moveCount > 6)
+                    R++;
+                if (isCapture && !position.StaticExchangeEvaluationGE(move))
+                    R++;
+
+                score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
+
+                position.Takeback(move);
+
+                if (Stop)
+                    return 0;
+
+                Debug.Assert(score > -Infinite && score < Infinite);
+               
+                if (score > bestScore)
+                {
+                    bestScore = score;
+
+                    if (score > alpha)
+                    {
+                        bestMove = move;
+
+                        if (score >= beta)
+                            break;
+                        else
+                        {
+                            alpha = score;
+
+                            if (depth > 1
+                                && depth < 6
+                                && beta < ExpectedWin
+                                && score > ExpectedLoss)
+                                depth--;
+
+                            Debug.Assert(depth > 0);
+                        }
+                    }
+                }
+            }
+
+            //If there is no legal moves in the position we are either mated or its stealmate
+            if (moveCount == 0)
+            {
+                bestScore = inCheck ? MatedIn(ply)
+                                    : DrawValue;
+            }
+
+            ttentry.Save(positionKey, false, bestMove, depth,
+                bestScore >= beta ? Bound.Lower
+                                  : Bound.Upper, bestScore);
+
+            return bestScore;
+        }
+
+        private int NodeSearch(NodeType nodeType, Span<SearchStack> stack, int ply, int alpha, int beta, int depth, Span<Move> pv = default)
+        {
+            bool IsRoot() => nodeType == NodeType.Root;
+            bool IsPV() => nodeType != NodeType.NonPV;
+
+            //If remainingDepth is equal or zero dive into Quisence Search
+            if (depth <= 0)
+                return QuiescenceSearch(nodeType, stack, ply, alpha, beta, 0, pv);
 
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha);
@@ -224,22 +659,27 @@ namespace Chessour.Search
             //Check to see if depth values are in allowed range
             Debug.Assert(depth > 0 && depth < MAX_DEPTH);
 
-            bool IsRoot() => nodeType == NodeType.Root;
-            bool IsPV() => nodeType != NodeType.NonPV;
-
             int score = -Infinite;
             int bestScore = -Infinite;
             Move bestMove = Move.None;
             Span<Move> childPv = stackalloc Move[MAX_PLY];
-
             Position.StateInfo state = states[ply];
-
             bool inCheck = stack[ply].inCheck = position.IsCheck();
-
-            CheckTime();
 
             if (IsPV())
                 selectiveDepth = Math.Max(selectiveDepth, ply + 1);
+
+            CheckTime();
+
+            if (position.FiftyMoveCounter >= 3
+                && alpha < DrawValue
+                && position.HasRepeated(ply))
+            {
+                alpha = DrawValue;
+
+                if (alpha >= beta)
+                    return alpha;
+            }
 
             if (!IsRoot())
             {
@@ -341,15 +781,15 @@ namespace Chessour.Search
 
                 int newDepth = depth - 1;
 
-                int extensions = 0;
+                int extension = 0;
 
                 if (ply + depth < RootDepth * 2)
                 {
                     if (givesCheck)
-                        extensions = 1;
+                        extension = 1;
                 }
 
-                newDepth += extensions;
+                newDepth += extension;
 
                 int R = 0;
                 if (!IsPV() || moveCount > 1)

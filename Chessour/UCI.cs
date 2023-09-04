@@ -173,8 +173,7 @@ namespace Chessour
 
         private void Bench(ref StringStream ss)
         {
-            ulong nodes = 0;
-
+            long nodes = 0;
             long elapsed = TimeManager.Now();
             ss.Extract(out string token);
 
@@ -194,7 +193,7 @@ namespace Chessour
 
                 Total time (ms) : {elapsed}
                 Nodes searched : {nodes}
-                Nps : {1000 * nodes / (ulong)elapsed}
+                Nps : {1000 * nodes / elapsed}
                 """);
         }
 
@@ -217,14 +216,14 @@ namespace Chessour
             StringBuilder sb = new(4 * 1024);
 
             var rootMove = searcher.rootMoves[0];
-            ulong nodesSearched = Engine.Threads.TotalNodesSearched();
+            var nodesSearched = Engine.Threads.TotalNodesSearched();
             var timeElapsed = Engine.Timer.Elapsed() + 1;
 
             sb.Append("info depth ").Append(depth);
             sb.Append(" seldepth ").Append(rootMove.SelectiveDepth);
             sb.Append(" score ").Append(Value(rootMove.UCIScore));
             sb.Append(" nodes ").Append(nodesSearched);
-            sb.Append(" nps ").Append(nodesSearched * 1000 / (ulong)timeElapsed);
+            sb.Append(" nps ").Append(nodesSearched * 1000 / timeElapsed);
             sb.Append(" hashfull ").Append(Engine.TTTable.Hashfull());
             sb.Append(" time ").Append(timeElapsed);
 
