@@ -367,3 +367,5 @@ FodyWeavers.xsd
 /ChessourTest/PerftTests.cs
 /ChessourTest/Usings.cs
 /ChessourTest/ChessourTest.csproj
+/ChessourTest/BitboardTests.cs
+/ChessourTest/SquareTests.cs
