@@ -564,9 +564,9 @@ namespace Chessour
             EnPassantSquare = Square.None;
             if (parts.Length > 3 && parts[3] != "-")
             {
-                File file = (File)parts[3][0];
-                Rank rank = (Rank)parts[3][1];
-
+                File file = (File)(parts[3][0] - 'a');
+                Rank rank = (Rank)(parts[3][1] - '1');
+                
                 EnPassantSquare = MakeSquare(file, rank);
             }
 

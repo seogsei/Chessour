@@ -254,7 +254,7 @@ namespace Chessour
                 return "mate " + mateDistance;
             }
             else
-                return "cp " + value;
+                return "cp " + value * 100 / Pieces.PawnValue;
         }
 
         public static string Move(Move move)
