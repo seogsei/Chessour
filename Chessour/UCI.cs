@@ -39,7 +39,7 @@ namespace Chessour
                         Engine.Stop = true;
                         break;
                     case "ponderhit":
-                        throw new NotImplementedException();
+                        Engine.Ponder = false;
                         break;
                     case "uci":
                         Identify();

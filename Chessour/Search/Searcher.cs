@@ -9,7 +9,7 @@ using static Chessour.Search.DepthConstants;
 
 namespace Chessour.Search
 {
-    public enum NodeType { Root, PV, NonPV}
+    public enum NodeType { Root, PV, NonPV }
 
     internal class Searcher
     {

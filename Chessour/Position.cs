@@ -44,6 +44,7 @@ namespace Chessour
         public int Repetition { get => state.repetition; }
         public int FullMove { get => (GamePly / 2) + 1; }
 
+        public Position(string fen) : this(fen, new()) { }
         public Position(StateInfo stateObject) : this(UCI.StartFEN, stateObject) { }
 
         public Position(string fen, StateInfo stateObject)

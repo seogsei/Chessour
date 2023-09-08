@@ -128,11 +128,11 @@ namespace Chessour
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                 }
 
                 return buffer[..generated];
@@ -298,16 +298,20 @@ namespace Chessour
                 const Color Us = Color.White;
                 
                 Square ksq = position.KingSquare(Us);
-                Bitboard occupancy = position.Pieces();
 
-                Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
+                int generated = 0;
 
-                int generated;
-                generated = GenerateWhitePawnMoves(position, targetSquares, buffer, 0);
-                generated = GenerateWhiteKnightMoves(position, targetSquares, buffer, generated);
-                generated = GenerateWhiteBishopMoves(position, targetSquares, occupancy, buffer, generated);
-                generated = GenerateWhiteRookMoves(position, targetSquares, occupancy, buffer, generated);
-                generated = GenerateWhiteQueenMoves(position, targetSquares, occupancy, buffer, generated);
+                if (!position.Checkers.MoreThanOne())
+                {
+                    Bitboard occupancy = position.Pieces();
+                    Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
+
+                    generated = GenerateWhitePawnMoves(position, targetSquares, buffer, generated);
+                    generated = GenerateWhiteKnightMoves(position, targetSquares, buffer, generated);
+                    generated = GenerateWhiteBishopMoves(position, targetSquares, occupancy, buffer, generated);
+                    generated = GenerateWhiteRookMoves(position, targetSquares, occupancy, buffer, generated);
+                    generated = GenerateWhiteQueenMoves(position, targetSquares, occupancy, buffer, generated);
+                }
 
                 //King moves
                 Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
@@ -323,16 +327,19 @@ namespace Chessour
                 const Color Us = Color.Black;
 
                 Square ksq = position.KingSquare(Us);
-                Bitboard occupancy = position.Pieces();
 
-                Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
+                int generated = 0;
+                if (!position.Checkers.MoreThanOne())
+                {
+                    Bitboard occupancy = position.Pieces();
+                    Bitboard targetSquares = Between(ksq, position.Checkers.LeastSignificantSquare()) | position.Checkers;
 
-                int generated;
-                generated = GenerateBlackPawnMoves(position, targetSquares, buffer, 0);
-                generated = GenerateBlackKnightMoves(position, targetSquares, buffer, generated);
-                generated = GenerateBlackBishopMoves(position, targetSquares, occupancy, buffer, generated);
-                generated = GenerateBlackRookMoves(position, targetSquares, occupancy, buffer, generated);
-                generated = GenerateBlackQueenMoves(position, targetSquares, occupancy, buffer, generated);
+                    generated = GenerateBlackPawnMoves(position, targetSquares, buffer, generated);
+                    generated = GenerateBlackKnightMoves(position, targetSquares, buffer, generated);
+                    generated = GenerateBlackBishopMoves(position, targetSquares, occupancy, buffer, generated);
+                    generated = GenerateBlackRookMoves(position, targetSquares, occupancy, buffer, generated);
+                    generated = GenerateBlackQueenMoves(position, targetSquares, occupancy, buffer, generated);
+                }
 
                 //King moves
                 Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
@@ -764,11 +771,11 @@ namespace Chessour
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
                 }
 
                 return buffer[..generated];
