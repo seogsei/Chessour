@@ -177,8 +177,6 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsCapture(Move move)
         {
-            Debug.Assert(IsLegal(move));
-
             return (!IsEmpty(move.DestinationSquare()) && move.Type() != MoveType.Castling) || move.Type() == MoveType.Promotion;
         }
 
@@ -318,6 +316,11 @@ namespace Chessour
             }
         }
 
+        public Piece MovedPiece(Move move)
+        {
+            return PieceAt(move.OriginSquare());
+        }
+
         public bool StaticExchangeEvaluationGE(Move move, int threshold = 0)
         {
             if (move.Type() != MoveType.Quiet)
@@ -398,8 +401,8 @@ namespace Chessour
                         break;
 
                     occupied ^= bb.LeastSignificantBit();
-                    attackers |= BishopAttacks(to, occupied) & Pieces(Bishop, Queen)
-                              | RookAttacks(to, occupied) & Pieces(Rook, Queen);
+                    attackers |= (BishopAttacks(to, occupied) & Pieces(Bishop, Queen))
+                              | (RookAttacks(to, occupied) & Pieces(Rook, Queen));
                 }
                 else
                 {

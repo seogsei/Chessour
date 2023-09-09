@@ -1,6 +1,5 @@
 ﻿using Chessour.Utilities;
 using System.Numerics;
-using System.Runtime.InteropServices;
 
 namespace Chessour.Search
 {
@@ -101,12 +100,12 @@ namespace Chessour.Search
             public int Depth
             {
                 get => depth8 + DepthConstants.TTOffset;
-                set => depth8 = (byte)(value - DepthConstants.TTOffset);
+                private set => depth8 = (byte)(value - DepthConstants.TTOffset);
             }
             public int Evaluation
             {
                 get => evaluation16;
-                set => evaluation16 = (short)value;
+                private set => evaluation16 = (short)value;
             }
             public Bound BoundType
             {
@@ -128,10 +127,15 @@ namespace Chessour.Search
 
             public void Save(Key key, bool isPV, Move move, int depth, Bound boundType, int evaluation)
             {
-                if (depth > Depth)
+                //If a non all node becomes an all node keep the previous move in case it becomes a pv or cut node
+                if (move != Move.None || key != Key)
+                    Move = move;
+
+                if (boundType == Bound.Exact
+                    || key != Key
+                    || depth + (isPV ? 2 : 0) > Depth)
                 {
                     Key = key;
-                    Move = move;
                     Depth = depth;
                     Evaluation = evaluation;
                     WriteExtras(Engine.TTTable.generation, isPV, boundType);

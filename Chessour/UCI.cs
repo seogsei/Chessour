@@ -173,8 +173,10 @@ namespace Chessour
 
         private void Bench(ref StringStream ss)
         {
+            Stopwatch timer = new();
+            timer.Start();
+
             long nodes = 0;
-            long elapsed = TimeManager.Now();
             ss.Extract(out string token);
 
             if (token == "go")
@@ -187,7 +189,7 @@ namespace Chessour
                 nodes += Engine.Threads.TotalNodesSearched();
             }
 
-            elapsed = TimeManager.Now() - elapsed + 1;
+            long elapsed = timer.ElapsedMilliseconds + 1;
 
             Console.WriteLine($"""
 
@@ -254,7 +256,7 @@ namespace Chessour
                 return "mate " + mateDistance;
             }
             else
-                return "cp " + value * 100 / Pieces.PawnValue;
+                return "cp " + (value * 100 / Pieces.PawnValue);
         }
 
         public static string Move(Move move)

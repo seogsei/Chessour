@@ -1,20 +1,11 @@
 ﻿using Chessour.Search;
 using static Chessour.Bitboards;
 using static Chessour.Color;
-using static Chessour.PieceType;
 using static Chessour.MoveExtensions;
+using static Chessour.PieceType;
 
 namespace Chessour
 {
-    public enum GenerationTypes
-    {
-        Captures,
-        QuietChecks,
-        Quiets,
-        NonEvasions,
-        Evasions,
-    }
-    
     public static class MoveGenerators
     {
         public const int MAX_MOVE_COUNT = 256;
@@ -62,13 +53,13 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
             {
-                return position.ActiveColor == Color.White ? White(position, buffer)
-                                                           : Black(position, buffer);
+                return position.ActiveColor == White ? GenerateWhite(position, buffer)
+                                                     : GenerateBlack(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateWhite(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.White;
+                const Color Us = White;
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
@@ -87,7 +78,7 @@ namespace Chessour
                 foreach (Square attack in kingAttacks)
                     buffer[generated++] = CreateMove(ksq, attack);
 
-                CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
@@ -102,9 +93,9 @@ namespace Chessour
                 return buffer[..generated];
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateBlack(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.Black;
+                const Color Us = Black;
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
@@ -123,7 +114,7 @@ namespace Chessour
                 foreach (Square attack in kingAttacks)
                     buffer[generated++] = CreateMove(ksq, attack);
 
-                CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
@@ -147,19 +138,19 @@ namespace Chessour
                 buffer[pointer++] = CreatePromotionMove(from, to, Knight);
                 return pointer;
             }
-          
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateWhitePawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.White;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = White;
+                const Color Enemy = Us == White ? Black : White;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Pieces(Enemy);
@@ -182,7 +173,7 @@ namespace Chessour
                 {
                     Bitboard promotionPush = promotionPawns.ShiftNorth() & emptySquares;
                     Bitboard promotionRight = promotionPawns.ShiftNorthEast() & enemies;
-                    Bitboard promotionLeft= promotionPawns.ShiftNorthWest() & enemies;
+                    Bitboard promotionLeft = promotionPawns.ShiftNorthWest() & enemies;
 
                     foreach (Square to in promotionPush)
                         pointer = GeneratePromotions(to - (int)Up, to, buffer, pointer);
@@ -214,19 +205,19 @@ namespace Chessour
 
                 return pointer;
             }
-           
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateBlackPawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.Black;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = Black;
+                const Color Enemy = Us == White ? Black : White;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Pieces(Enemy);
@@ -289,14 +280,14 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
             {
-                return position.ActiveColor == Color.White ? White(position, buffer)
-                                                            : Black(position, buffer);
+                return position.ActiveColor == White ? GenerateWhite(position, buffer)
+                                                            : GenerateBlack(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateWhite(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.White;
-                
+                const Color Us = White;
+
                 Square ksq = position.KingSquare(Us);
 
                 int generated = 0;
@@ -322,9 +313,9 @@ namespace Chessour
                 return buffer[..generated];
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateBlack(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.Black;
+                const Color Us = Black;
 
                 Square ksq = position.KingSquare(Us);
 
@@ -359,18 +350,18 @@ namespace Chessour
                 buffer[pointer++] = CreatePromotionMove(from, to, Knight);
                 return pointer;
             }
-           
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateWhitePawnMoves(Position position, Bitboard targets, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.White;
+                const Color Us = White;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Checkers;
@@ -394,7 +385,7 @@ namespace Chessour
                 //Promotions
                 if (promotionPawns != 0)
                 {
-                    Bitboard promotionPush = promotionPawns.ShiftNorth() & emptySquares;                
+                    Bitboard promotionPush = promotionPawns.ShiftNorth() & emptySquares;
                     Bitboard promotionRight = promotionPawns.ShiftNorthEast() & enemies;
                     Bitboard promotionLeft = promotionPawns.ShiftNorthWest() & enemies;
 
@@ -434,18 +425,18 @@ namespace Chessour
 
                 return pointer;
             }
-           
+
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateBlackPawnMoves(Position position, Bitboard targets, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.Black;
+                const Color Us = Black;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Checkers;
@@ -516,14 +507,14 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public static Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
             {
-                return position.ActiveColor == Color.White ? White(position, buffer)
-                                                           : Black(position, buffer);
+                return position.ActiveColor == White ? GenerateWhite(position, buffer)
+                                                           : GenerateBlack(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateWhite(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.White;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = White;
+                const Color Enemy = Us == White ? Black : White;
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
                 Bitboard targetSquares = position.Pieces(Enemy);
@@ -544,10 +535,10 @@ namespace Chessour
                 return buffer[..generated];
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateBlack(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.Black;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = Black;
+                const Color Enemy = Us == White ? Black : White;
 
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
@@ -566,7 +557,7 @@ namespace Chessour
                 foreach (Square attack in kingAttacks)
                     buffer[generated++] = CreateMove(ksq, attack);
 
-                return buffer[..generated];           
+                return buffer[..generated];
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -589,14 +580,14 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateWhitePawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.White;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = White;
+                const Color Enemy = Us == White ? Black : White;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Pieces(Enemy);
@@ -645,14 +636,14 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateBlackPawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.Black;
-                const Color Enemy = Us == Color.White ? Color.Black : Color.White;
+                const Color Us = Black;
+                const Color Enemy = Us == White ? Black : White;
 
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Direction UpRight = Us == Color.White ? Direction.NorthEast : Direction.SouthWest;
-                const Direction UpLeft = Us == Color.White ? Direction.NorthWest : Direction.SouthEast;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Direction UpRight = Us == White ? Direction.NorthEast : Direction.SouthWest;
+                const Direction UpLeft = Us == White ? Direction.NorthWest : Direction.SouthEast;
 
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
 
                 Bitboard emptySquares = ~position.Pieces();
                 Bitboard enemies = position.Pieces(Enemy);
@@ -703,15 +694,15 @@ namespace Chessour
         public static class Quiet
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            public static  Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
+            public static Span<MoveScore> Generate(Position position, Span<MoveScore> buffer)
             {
-                return position.ActiveColor == Color.White ? White(position, buffer)
-                                                           : Black(position, buffer);
+                return position.ActiveColor == White ? GenerateWhite(position, buffer)
+                                                           : GenerateBlack(position, buffer);
             }
 
-            private static Span<MoveScore> White(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateWhite(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.White;
+                const Color Us = White;
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
@@ -730,7 +721,7 @@ namespace Chessour
                 foreach (Square attack in kingAttacks)
                     buffer[generated++] = CreateMove(ksq, attack);
 
-                CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
@@ -745,9 +736,9 @@ namespace Chessour
                 return buffer[..generated];
             }
 
-            private static Span<MoveScore> Black(Position position, Span<MoveScore> buffer)
+            private static Span<MoveScore> GenerateBlack(Position position, Span<MoveScore> buffer)
             {
-                const Color Us = Color.Black;
+                const Color Us = Black;
                 Square ksq = position.KingSquare(Us);
                 Bitboard occupancy = position.Pieces();
 
@@ -766,7 +757,7 @@ namespace Chessour
                 foreach (Square attack in kingAttacks)
                     buffer[generated++] = CreateMove(ksq, attack);
 
-                CastlingRight ourSide = Us == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
+                CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
@@ -793,10 +784,10 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateWhitePawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.White;
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Color Us = White;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
 
@@ -828,10 +819,10 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateBlackPawnMoves(Position position, Span<MoveScore> buffer, int pointer)
             {
-                const Color Us = Color.Black;
-                const Direction Up = Us == Color.White ? Direction.North : Direction.South;
-                const Bitboard RelativeRank7 = Us == Color.White ? Bitboard.Rank7 : Bitboard.Rank2;
-                const Bitboard RelativeRank3 = Us == Color.White ? Bitboard.Rank3 : Bitboard.Rank6;
+                const Color Us = Black;
+                const Direction Up = Us == White ? Direction.North : Direction.South;
+                const Bitboard RelativeRank7 = Us == White ? Bitboard.Rank7 : Bitboard.Rank2;
+                const Bitboard RelativeRank3 = Us == White ? Bitboard.Rank3 : Bitboard.Rank6;
 
                 Bitboard emptySquares = ~position.Pieces();
 
@@ -856,15 +847,15 @@ namespace Chessour
                     foreach (Square to in promotionPush)
                         pointer = GeneratePromotions(to - (int)Up, to, buffer, pointer);
                 }
-             
+
                 return pointer;
             }
         }
-        
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int GenerateWhiteKnightMoves(Position position, Bitboard targetSquares, Span<MoveScore> buffer, int pointer)
         {
-            foreach (Square pieceSquare in position.Pieces(White, Knight)) 
+            foreach (Square pieceSquare in position.Pieces(White, Knight))
             {
                 Bitboard attacks = KnightAttacks(pieceSquare) & targetSquares;
 
@@ -964,5 +955,5 @@ namespace Chessour
             }
             return pointer;
         }
-       }
+    }
 }

@@ -45,7 +45,7 @@
                 { new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0), new( 50,  0) },
                 { new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0), new(  0,  0) },
         };
-        
+
         private static readonly ScoreTuple[,] knightBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB / 2]
         {
                 { new(-175, -96), new(-92,-65), new(-74,-49), new(-73,-21) },
@@ -57,7 +57,7 @@
                 { new( -67, -69), new(-27,-50), new(  4,-51), new( 37, 12) },
                 { new(-201,-100), new(-83,-88), new(-56,-56), new(-26,-17) },
         };
-       
+
         private static readonly ScoreTuple[,] bishopBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB / 2]
         {
                 { new(-37,-40), new(-4 ,-21), new( -6,-26), new(-16, -8) },
@@ -69,7 +69,7 @@
                 { new(-12,-22), new(-10,-14), new(  4, -1), new(  0,  1) },
                 { new(-34,-32), new(  1,-29), new(-10,-26), new(-16,-17) },
         };
-        
+
         private static readonly ScoreTuple[,] rookBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB / 2]
         {
                 { new(-31, -9), new(-20,-13), new(-14,-10), new(-5, -9) },
@@ -81,7 +81,7 @@
                 { new( -2,  4), new( 12,  5), new( 16, 20), new(18, -5) },
                 { new(-17, 18), new(-19,  0), new( -1, 19), new( 9, 13) },
         };
-       
+
         private static readonly ScoreTuple[,] queenBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB / 2]
         {
                 { new( 3,-69), new(-5,-57), new(-5,-47), new( 4,-26) },
@@ -93,7 +93,7 @@
                 { new(-5,-50), new( 6,-27), new(10,-24), new( 8, -8) },
                 { new(-2,-74), new(-2,-52), new( 1,-43), new(-2,-34) },
         };
-       
+
         private static readonly ScoreTuple[,] kingBonuses = new ScoreTuple[(int)Rank.NB, (int)File.NB / 2]
         {
                 { new(270, 10), new(330, 40), new(270, 80), new(200, 80) },

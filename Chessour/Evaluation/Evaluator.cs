@@ -9,7 +9,7 @@ namespace Chessour.Evaluation
     {
         public const int DrawValue = 0;
 
-        public const int ExpectedWin = 25000;
+        public const int ExpectedWin = MateInMaxPly - 1;
         public const int ExpectedLoss = -ExpectedWin;
 
         public const int MateValue = 32000;
@@ -100,7 +100,7 @@ namespace Chessour.Evaluation
 
             int normalizedPhase = phase * 256 / Phase.Total;
 
-            int eval = (endGame * (256 - normalizedPhase) + midGame * normalizedPhase) / 256;
+            int eval = ((endGame * (256 - normalizedPhase)) + (midGame * normalizedPhase)) / 256;
 
             return eval;
         }

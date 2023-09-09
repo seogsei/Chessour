@@ -1,16 +1,11 @@
 ﻿using Chessour.Evaluation;
-using System.Collections;
 using System.Collections.Generic;
-using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
 using static Chessour.Engine;
 using static Chessour.Evaluation.Evaluator;
 using static Chessour.Search.DepthConstants;
 
 namespace Chessour.Search
 {
-    public enum NodeType { Root, PV, NonPV }
-
     internal class Searcher
     {
         public Searcher()
@@ -30,7 +25,7 @@ namespace Chessour.Search
         private readonly Position position;
         private readonly Position.StateInfo rootState;
         private readonly Position.StateInfo[] states;
-        
+
         private int completedDepth;
         private int selectiveDepth;
 
@@ -67,9 +62,9 @@ namespace Chessour.Search
         protected long Perft(int depth, int distance)
         {
             long totalNodes = 0, branchNodes;
-            var state = states[distance];         
+            var state = states[distance];
 
-            foreach(Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]))
+            foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]))
             {
                 if (depth == 1)
                     totalNodes += branchNodes = 1;
@@ -100,7 +95,7 @@ namespace Chessour.Search
 
             int maxPvIdx = Math.Min(1, rootMoves.Count);
 
-            while(++RootDepth < MaxDepth
+            while (++RootDepth < MaxDepth
                 && !Stop
                 && !(SearchLimits.Depth > 0 && RootDepth > SearchLimits.Depth))
             {
@@ -112,11 +107,11 @@ namespace Chessour.Search
                     selectiveDepth = 0;
 
                     int previousScore = rootMoves[pvIdx].PreviousScore;
-                    int delta = Pieces.PawnValue + previousScore * previousScore / 4096;
-                    int alpha =  Math.Max(previousScore - delta, -Infinite);
+                    int delta = Pieces.PawnValue + (previousScore * previousScore / 4096);
+                    int alpha = Math.Max(previousScore - delta, -Infinite);
                     int beta = Math.Min(previousScore + delta, +Infinite);
 
-                    while (true) 
+                    while (true)
                     {
                         //bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, RootDepth);
                         bestValue = RootSearch(stack, alpha, beta, RootDepth);
@@ -176,7 +171,7 @@ namespace Chessour.Search
             Span<Move> childPv = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[0];
             bool inCheck = stack[0].inCheck = position.IsCheck();
-            
+
             selectiveDepth = 1;
 
             if (inCheck)
@@ -197,27 +192,22 @@ namespace Chessour.Search
 
                 int newDepth = depth - 1;
 
-                int extension = 0;
-
-                if (givesCheck)
-                    extension = 1;
-
-                newDepth += extension;
+                newDepth += Extensions(givesCheck);
 
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
                 if (moveCount > 1)
                 {
-                    int R = Reductions(move, moveCount, piece, isCapture, givesCheck);
+                    int R = Reductions(moveCount, piece, givesCheck, isCapture);
 
                     score = -ZWSearch(stack, 1, -(alpha + 1), newDepth - R);
                 }
 
                 if (moveCount == 1 || (score > alpha))
                 {
-                    childPv[0] = Move.None;                   
-                    score = -PVSearch( stack, 1, -beta, -alpha, newDepth, childPv);
+                    childPv[0] = Move.None;
+                    score = -PVSearch(stack, 1, -beta, -alpha, newDepth, childPv);
                 }
 
                 position.Takeback(move);
@@ -247,20 +237,22 @@ namespace Chessour.Search
                     rootMove.PV.Add(move);
 
                     foreach (Move pvMove in childPv)
-                        if (pvMove != Move.None)
-                            rootMove.PV.Add(pvMove);
-                        else
+                    {
+                        if (pvMove == Move.None)
                             break;
+
+                        rootMove.PV.Add(pvMove);
+                    }
                 }
                 else
                     rootMove.Score = -Infinite;
 
                 if (score > alpha)
-                {
-                    alpha = score;
-
+                {                 
                     if (alpha >= beta) //Fail high which means we need to research with a bigger aspiration window
                         break;
+                    else
+                        alpha = score; //In root node previous best score is alpha
 
                     if (depth > 1
                         && depth < 6
@@ -279,7 +271,7 @@ namespace Chessour.Search
         {
             //If remainingDepth is equal or zero dive into Quisence Search
             if (depth <= 0)
-                return QuiescenceSearch(NodeType.PV, stack, ply, alpha, beta, 0, pv);
+                return QuiescenceSearch(true, stack, ply, alpha, beta, 0, pv);
 
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha);
@@ -353,7 +345,7 @@ namespace Chessour.Search
                     evaluation = stack[ply].evaluation = Evaluate(position);
                 }
             }
-          
+
             MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
             int moveCount = 0;
             int nextPly = ply + 1;
@@ -370,21 +362,15 @@ namespace Chessour.Search
 
                 int newDepth = depth - 1;
 
-                int extensions = 0;
                 if (ply < RootDepth * 2)
-                {
-                    if (givesCheck)
-                        extensions = 1;
-                }
-
-                newDepth += extensions;
-
+                    newDepth += Extensions(givesCheck);
+               
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
                 if (moveCount > 1)
                 {
-                    int R = Reductions(move, moveCount, piece, isCapture, givesCheck);
+                    int R = Reductions(moveCount, piece, givesCheck, isCapture);
 
                     score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
                 }
@@ -401,7 +387,7 @@ namespace Chessour.Search
                     return 0;
 
                 Debug.Assert(score > -Infinite && score < Infinite);
-                
+
                 if (score > bestScore)
                 {
                     bestScore = score;
@@ -433,14 +419,17 @@ namespace Chessour.Search
             //If there is no legal moves in the position we are either mated or its stealmate
             if (moveCount == 0)
             {
+                Debug.Assert(MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length == 0);
+
                 bestScore = inCheck ? MatedIn(ply)
                                     : DrawValue;
             }
 
-            ttentry.Save(positionKey, true, bestMove, depth,
-                bestScore >= beta ? Bound.Lower
-                                  : bestMove != Move.None ? Bound.Exact
-                                                          : Bound.Upper, bestScore);
+            Bound boundType = bestScore >= beta ? Bound.Lower //If a beta cut-off happened then this node is valued higher then the current eval
+                                  : bestMove != Move.None ? Bound.Exact // Atleast one move raised alpha
+                                                          : Bound.Upper; // This is an all node
+
+            ttentry.Save(positionKey, true, bestMove, depth, boundType, bestScore);
 
             return bestScore;
         }
@@ -451,7 +440,7 @@ namespace Chessour.Search
 
             //If remainingDepth is equal or zero dive into Quisence Search
             if (depth <= 0)
-                return QuiescenceSearch(NodeType.NonPV, stack, ply, alpha, beta);
+                return QuiescenceSearch(false, stack, ply, alpha, beta);
 
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha);
@@ -495,7 +484,7 @@ namespace Chessour.Search
             //Transposition table lookup
             Key positionKey = position.PositionKey;
             ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
-            
+
             stack[ply].ttHit = ttHit;
 
             int ttEval = ttHit ? ttentry.Evaluation : 0;
@@ -504,48 +493,48 @@ namespace Chessour.Search
 
             int evaluation = 0;
 
-            if (inCheck)
+            if (!inCheck) 
             {
-                evaluation = stack[ply].evaluation = -Infinite;
-                goto movesLoop;
-            }
-
-            if (ttHit)
-            {
-                evaluation = stack[ply].evaluation = ttentry.Evaluation;
-            }
-            else
-            {
-                evaluation = stack[ply].evaluation = Evaluate(position);
-            }
-
-            //Futility Pruning
-            if (depth < 9
-                && evaluation >= beta + 2 * Pieces.QueenValue
-                && evaluation < ExpectedWin + 1)
-                return evaluation;
-
-            //Null move reduction
-            if (stack[ply - 1].currentMove != Move.Null
-                && evaluation >= beta)
-            {
-                int R = (depth / 4) + 3;
-
-                stack[ply].currentMove = Move.Null;
-
-                position.MakeNullMove(state);
-
-                int nullScore = -ZWSearch(stack, ply + 1, -beta, depth - R);
-
-                position.TakebackNullMove();
-
-                if (nullScore >= beta)
+                if (ttHit)
                 {
-                    depth -= 4;
+                    evaluation = stack[ply].evaluation = ttentry.Evaluation;
+                }
+                else
+                {
+                    evaluation = stack[ply].evaluation = Evaluate(position);
+                }
+
+                //Futility Pruning
+                if (depth < 5
+                    && evaluation >= beta + (2 * Pieces.QueenValue) // If we are somehow two queens up than expected most likely this position wont be played
+                    && evaluation < MateInMaxPly - 1) //Dont return unproven mates 
+                    return evaluation;
+
+                //Null move reduction
+                if (stack[ply - 1].currentMove != Move.Null
+                    && evaluation >= beta)
+                {
+                    int R = (depth / 4) + 3;
+
+                    stack[ply].currentMove = Move.Null;
+
+                    position.MakeNullMove(state);
+
+                    int nullScore = -ZWSearch(stack, ply + 1, -beta, depth - R);
+
+                    position.TakebackNullMove();
+
+                    if (nullScore >= beta)
+                    {
+                        depth -= 4;
+
+                        if (depth <= 0)
+                            return QuiescenceSearch(false, stack, ply, alpha, beta);
+                    }
                 }
             }
-
-            movesLoop:
+            else
+                evaluation = stack[ply].evaluation = -Infinite;
 
             MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
             int moveCount = 0;
@@ -563,20 +552,13 @@ namespace Chessour.Search
 
                 int newDepth = depth - 1;
 
-                int extensions = 0;
-
                 if (ply < RootDepth * 2)
-                {
-                    if (givesCheck)
-                        extensions = 1;
-                }
-
-                newDepth += extensions;
+                    newDepth += Extensions(givesCheck);
 
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                int R = Reductions(move, moveCount, piece, isCapture, givesCheck);
+                int R = Reductions(moveCount, piece, givesCheck, isCapture);
 
                 score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
 
@@ -627,14 +609,12 @@ namespace Chessour.Search
             return bestScore;
         }
 
-        private int QuiescenceSearch(NodeType nodeType, Span<SearchStack> stack, int ply, int alpha, int beta, int depth = 0, Span<Move> pv = default)
+        private int QuiescenceSearch(bool pvNode, Span<SearchStack> stack, int ply, int alpha, int beta, int depth = 0, Span<Move> pv = default)
         {
-            bool IsPV() => nodeType != NodeType.NonPV;
-
             //Check if the alpha and beta values are within acceptable values
             Debug.Assert(-Infinite <= alpha && alpha < beta && beta <= Infinite);
             //This is a pv node or we are in a aspiration search
-            Debug.Assert(IsPV() || alpha == beta - 1);
+            Debug.Assert(pvNode || alpha == beta - 1);
             //Depth is negative
             Debug.Assert(depth <= 0 && depth > TTOffset);
 
@@ -653,7 +633,7 @@ namespace Chessour.Search
                 if (alpha >= beta)
                     return alpha;
             }
-            
+
             //Mate distance pruning
             alpha = Math.Max(MatedIn(ply), alpha);
             beta = Math.Min(MateIn(ply), beta);
@@ -669,7 +649,7 @@ namespace Chessour.Search
 
             CheckTime();
 
-            if (IsPV())
+            if (pvNode)
                 pv[0] = Move.None;
 
             if (ply >= MAX_PLY)
@@ -694,7 +674,7 @@ namespace Chessour.Search
             }
 
             //Transposition cuttoff
-            if (!IsPV()
+            if (!pvNode
                 && ttHit
                 && ttentry.Depth >= ttDepth
                 && (ttentry.BoundType & (ttScore >= beta ? Bound.Lower : Bound.Upper)) != 0)
@@ -725,12 +705,12 @@ namespace Chessour.Search
                 if (bestValue >= beta)
                 {
                     if (!ttHit)
-                        ttentry.Save(positionKey, IsPV(), Move.None, 0, Bound.Lower, stack[ply].evaluation);
+                        ttentry.Save(positionKey, pvNode, Move.None, 0, Bound.Lower, stack[ply].evaluation);
 
                     return bestValue;
                 }
 
-                if (IsPV() && bestValue > alpha)
+                if (pvNode && bestValue > alpha)
                     alpha = bestValue;
             }
 
@@ -755,10 +735,10 @@ namespace Chessour.Search
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                if (IsPV())
+                if (pvNode)
                     childPV[0] = Move.None;
 
-                int score = -QuiescenceSearch(nodeType, stack, ply + 1, -beta, -alpha, Math.Max(depth - 1, TTOffset + 1), childPV);
+                int score = -QuiescenceSearch(pvNode, stack, ply + 1, -beta, -alpha, Math.Max(depth - 1, TTOffset + 1), childPV);
 
                 position.Takeback(move);
 
@@ -775,7 +755,7 @@ namespace Chessour.Search
                     {
                         bestMove = move;
 
-                        if (IsPV())
+                        if (pvNode)
                             UpdatePV(pv, move, childPV);
                         if (score < beta)
                             alpha = score;
@@ -792,16 +772,25 @@ namespace Chessour.Search
                 return MatedIn(ply);
             }
 
-            ttentry.Save(positionKey, IsPV(), bestMove, ttDepth,
+            ttentry.Save(positionKey, pvNode, bestMove, ttDepth,
                 bestValue >= beta ? Bound.Lower
-                                 : IsPV() && bestMove != Move.None ? Bound.Exact
+                                 : pvNode && bestMove != Move.None ? Bound.Exact
                                                                    : Bound.Upper, bestValue);
 
             return bestValue;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int Reductions(Move move, int moveCount, Piece piece, bool isCapture, bool givesCheck)
+        private int Extensions(bool isCheck)
+        {
+            if (isCheck)
+                return 1;
+
+            return 0;
+        }
+        
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private int Reductions(int moveCount, Piece piece, bool givesCheck, bool isCapture)
         {
             if (givesCheck)
                 return 0;
@@ -819,7 +808,7 @@ namespace Chessour.Search
 
         private static void CheckTime()
         {
-            if(SearchLimits.RequiresTimeManagement() && Timer.Elapsed() > Timer.MaxTime)
+            if (SearchLimits.RequiresTimeManagement() && Timer.Elapsed() > Timer.MaxTime)
                 Stop = true;
         }
 
@@ -827,7 +816,7 @@ namespace Chessour.Search
         {
             int i = 0, j = 0;
             pv[i++] = move;
-            if(childPv.Length > 0)
+            if (childPv.Length > 0)
                 while (childPv[j] != Move.None)
                 {
                     pv[i++] = childPv[j++];

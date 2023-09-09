@@ -98,9 +98,9 @@ namespace Chessour.Search
                 Console.WriteLine($"Nodes searched : {searcher.NodeCount}");
                 return;
             }
-         
+
             foreach (var thread in Engine.Threads)
-                if(thread != this)
+                if (thread != this)
                     thread.Release();
 
             //Start searching on this thread

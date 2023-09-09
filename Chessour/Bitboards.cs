@@ -1,8 +1,8 @@
 ﻿using Chessour.Utilities;
 using System.Numerics;
-using Pext = System.Runtime.Intrinsics.X86.Bmi2.X64;
 using static Chessour.Direction;
 using static Chessour.PieceType;
+using Pext = System.Runtime.Intrinsics.X86.Bmi2.X64;
 
 namespace Chessour
 {
@@ -326,7 +326,7 @@ namespace Chessour
 
             return to.IsValid() && Bitboards.Distance(square, to) <= 2 ? to.ToBitboard() : 0;
         }
-         
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Bitboard ToBitboard(this Square square)
         {
@@ -467,7 +467,7 @@ namespace Chessour
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             public bool MoveNext()
-            {   
+            {
                 if (bitboard == 0) return false;
 
                 Current = bitboard.LeastSignificantSquare(); //Gets the index of least significant bit

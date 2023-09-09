@@ -1,11 +1,17 @@
 ﻿using Chessour.Evaluation;
 using Chessour.Utilities;
-using static Chessour.GenerationTypes;
 
 namespace Chessour.Search
 {
     internal ref struct MovePicker
     {
+        private enum Stage
+        {
+            MainTT, CaptureGenerate, GoodCaptures, QuietGenerate, Quiet, BadCaptures,
+            EvasionTT, EvasionGenerate, Evasions,
+            QSearchTT, QCaptureGenerate, QCapture
+        }
+
         public MovePicker(Position position, Move ttMove, Span<MoveScore> buffer)
         {
             this.buffer = buffer;
@@ -31,23 +37,17 @@ namespace Chessour.Search
                 stage++;
         }
 
-        private enum Stage
-        {
-            MainTT, CaptureGenerate, GoodCaptures, QuietGenerate, Quiet, BadCaptures,
-            EvasionTT, EvasionGenerate, Evasions,
-            QSearchTT, QCaptureGenerate, QCapture
-        }
-
         private readonly Span<MoveScore> buffer;
-        private readonly Position position;
-        private readonly Move ttMove;
-        private readonly Square refutationSquare;
-
         private int pointer;
         private int end;
         private Stage stage;
 
+        private readonly Position position;
+        private readonly Move ttMove;
+        private readonly Square refutationSquare;
+
         public Move Current { get; private set; }
+        public MovePicker GetEnumerator() => this;
 
         public bool MoveNext()
         {
@@ -66,9 +66,9 @@ namespace Chessour.Search
                     //Normal Positions
                     case Stage.CaptureGenerate:
                     case Stage.QCaptureGenerate:
-                        end = pointer + MoveGenerators.Capture.Generate(position, buffer[pointer..]).Length;
-                        Score(Captures);
-                        InsertionSort.PartialSort(buffer, pointer, end);
+                        end += MoveGenerators.Capture.Generate(position, buffer).Length;
+                        ScoreCaptures();
+                        InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
                         break;
                     case Stage.GoodCaptures:
@@ -78,9 +78,9 @@ namespace Chessour.Search
                         stage++;
                         break;
                     case Stage.QuietGenerate:
-                        end = pointer + MoveGenerators.Quiet.Generate(position, buffer[pointer..]).Length;
-                        Score(Quiets);
-                        InsertionSort.PartialSort(buffer, pointer, end);
+                        end += MoveGenerators.Quiet.Generate(position, buffer[end..]).Length;
+                        ScoreQuiets();
+                        InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
                         break;
                     case Stage.Quiet:
@@ -96,7 +96,9 @@ namespace Chessour.Search
                         return false;
 
                     case Stage.EvasionGenerate:
-                        end = pointer + MoveGenerators.Evasion.Generate(position, buffer[pointer..]).Length;
+                        end += MoveGenerators.Evasion.Generate(position, buffer).Length;
+                        ScoreEvasions();
+                        InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
                         break;
                     case Stage.Evasions:
@@ -110,32 +112,6 @@ namespace Chessour.Search
             }
         }
 
-        public void Score(GenerationTypes type)
-        {
-            switch (type)
-            {
-                case Captures:
-                    for (int i = pointer; i < end; i++)
-                    {
-                        Move move = buffer[i].Move;
-                        buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()))
-                                        - Pieces.PieceValue(position.PieceAt(move.OriginSquare()))
-                                        + (move.Type() == MoveType.Promotion ? Pieces.PieceValue(move.PromotionPiece()) : 0);
-                    }
-                    return;
-                case Quiets:
-                    for (int i = pointer; i < end; i++)
-                    {
-                        Move move = buffer[i].Move;
-                        Piece piece = position.PieceAt(move.OriginSquare());
-                        buffer[i].Score = PSQT.Get(piece, move.DestinationSquare()).MidGame
-                                        - PSQT.Get(piece, move.OriginSquare()).MidGame
-                                        + (move.Type() == MoveType.Promotion ? Pieces.PieceValue(move.PromotionPiece()) : 0);
-                    }
-                    return;
-            }
-        }
-
         private Move FindNext()
         {
             while (pointer < end)
@@ -144,11 +120,55 @@ namespace Chessour.Search
 
                 if (move != ttMove)
                     return move;
+                else
+                    continue;
             }
 
             return Move.None;
         }
 
-        public MovePicker GetEnumerator() => this;
+        private void ScoreCaptures()
+        {
+            for (int i = pointer; i < end; i++)
+            {
+                Move move = buffer[i].Move;
+                buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()));                              
+            }
+        }
+
+        private void ScoreQuiets()
+        {
+            for (int i = pointer; i < end; i++)
+            {
+                Move move = buffer[i].Move;
+                Piece piece = position.PieceAt(move.OriginSquare());
+                buffer[i].Score = move.Type() == MoveType.Promotion ? Pieces.QueenValue
+                                                                    : PSQT.Get(piece, move.DestinationSquare()).MidGame
+                                                                    - PSQT.Get(piece, move.OriginSquare()).MidGame;
+            }
+        }
+
+        private void ScoreEvasions()
+        {
+            //We want to search captures first after a check so we give them this 
+            //huge bonus to move them up during sorting
+            const int evasionCaptureBonus = 4 * Pieces.QueenValue; 
+
+            for (int i = pointer; i < end; i++)
+            {
+                Move move = buffer[i].Move;
+                if (position.IsCapture(move))
+                {
+                    buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare())) + (evasionCaptureBonus);
+                }
+                else
+                {
+                    Piece piece = position.PieceAt(move.OriginSquare());
+                    buffer[i].Score = move.Type() == MoveType.Promotion ? Pieces.QueenValue
+                                                                        : PSQT.Get(piece, move.DestinationSquare()).MidGame
+                                                                        - PSQT.Get(piece, move.OriginSquare()).MidGame;
+                }
+            }
+        }
     }
 }
