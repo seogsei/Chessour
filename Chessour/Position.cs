@@ -326,8 +326,8 @@ namespace Chessour
             if (move.Type() != MoveType.Quiet)
                 return 0 >= threshold;
 
-            Square from = move.DestinationSquare();
-            Square to = move.OriginSquare();
+            Square from = move.OriginSquare();
+            Square to = move.DestinationSquare();
 
             int swap = Evaluation.Pieces.PieceValue(PieceAt(to)) - threshold;
 
