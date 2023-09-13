@@ -8,6 +8,32 @@ namespace Chessour.Search
 {
     internal class Searcher
     {
+        static Searcher()
+        {
+            for (int i = 0; i < reductions.Length; i++)
+                reductions[i] = MathF.Log(i);
+        }
+
+        private static readonly float[] reductions = new float[MAX_PLY];
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int Extensions(int depth, bool givesCheck)
+        {
+            if (givesCheck && depth > 7)
+                return 1;
+
+            return 0;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int Reductions(int moveCount, int depth)
+        {
+            int R = (int)(reductions[moveCount] * reductions[depth]);
+
+            return R;
+        }
+        
+
         public Searcher()
         {
             rootState = new();
@@ -29,8 +55,11 @@ namespace Chessour.Search
         private int completedDepth;
         private int selectiveDepth;
 
+        //We can use the last 12 bits of a MOVE to index this 
+        private readonly ButterflyTable butterflyTable = new(); 
+
         public bool SendInfo { get; set; }
-        public long NodeCount { get; set; }
+        public long NodeCount { get; private set; }
         public int RootDepth { get; private set; }
 
         public void SetSearchParameters(Position position, List<Move>? moves)
@@ -46,11 +75,9 @@ namespace Chessour.Search
                     rootMoves.Add(new RootMove(move));
         }
 
-        public void ResetSearchStats()
+        public void ClearHistoryTables()
         {
-            completedDepth = selectiveDepth = 0;
-            RootDepth = 0;
-            NodeCount = 0;
+            butterflyTable.Clear();
         }
 
         public long Perft(int depth)
@@ -87,14 +114,17 @@ namespace Chessour.Search
 
         public void Search()
         {
-            ResetSearchStats();
+            RootDepth = 0;
+            NodeCount = 0;
+            completedDepth = selectiveDepth = 0;
 
             Span<SearchStack> stack = stackalloc SearchStack[MAX_PLY];
+            
+            SortRootMoves();
 
-            int bestValue = -Infinite;
+            int bestValue = -InfiniteScore;
 
             int maxPvIdx = Math.Min(1, rootMoves.Count);
-
             while (++RootDepth < MaxDepth
                 && !Stop
                 && !(SearchLimits.Depth > 0 && RootDepth > SearchLimits.Depth))
@@ -106,34 +136,34 @@ namespace Chessour.Search
                 {
                     selectiveDepth = 0;
 
-                    int previousScore = rootMoves[pvIdx].PreviousScore;
-                    int delta = Pieces.PawnValue + (previousScore * previousScore / 4096);
-                    int alpha = Math.Max(previousScore - delta, -Infinite);
-                    int beta = Math.Min(previousScore + delta, +Infinite);
+                    int previousScore = rootMoves[pvIdx].AvarageScore;
+
+                    int delta = Pieces.PawnValue / 2 + (previousScore * previousScore) / 16384;
+                    int alpha = Math.Max(previousScore - delta, -InfiniteScore);
+                    int beta = Math.Min(previousScore + delta, +InfiniteScore);
 
                     while (true)
                     {
-                        //bestValue = NodeSearch(NodeType.Root, stack, 0, alpha, beta, RootDepth);
                         bestValue = RootSearch(stack, alpha, beta, RootDepth);
 
                         rootMoves.Sort(pvIdx);
-
                         if (Stop)
                             break;
 
                         if (bestValue <= alpha) //Fail low
                         {
-                            alpha = Math.Max(bestValue - delta, -Infinite);
+                            alpha = Math.Max(bestValue - delta, -InfiniteScore);
                         }
                         else if (bestValue >= beta) //Fail high
                         {
-                            beta = Math.Min(bestValue + delta, Infinite);
+                            beta = Math.Min(bestValue + delta, +InfiniteScore);
                         }
                         else
                             break;
 
                         delta = beta - alpha;
-                        Debug.Assert(-Infinite <= alpha && beta <= Infinite);
+
+                        Debug.Assert(-InfiniteScore <= alpha && beta <= InfiniteScore);
                     }
 
                     if (SendInfo
@@ -147,8 +177,8 @@ namespace Chessour.Search
                     completedDepth = RootDepth;
 
                 if (SearchLimits.Mate > 0
-                    && bestValue >= MateValue
-                    && MateValue - bestValue >= 2 * SearchLimits.Mate)
+                    && bestValue >= MateScore
+                    && MateScore - bestValue >= 2 * SearchLimits.Mate)
                     Stop = true;
 
                 if (SearchLimits.RequiresTimeManagement() && Timer.Elapsed() > Timer.OptimumTime)
@@ -156,18 +186,37 @@ namespace Chessour.Search
             }
         }
 
+        private void SortRootMoves()
+        {
+
+            //Sort root moves before the first iteration of search
+            int sortingScore = 0;
+            MovePicker movePicker = new(position, Move.None, butterflyTable, stackalloc MoveScore[256]);
+            foreach (var move in movePicker)
+            {
+                RootMove? rootMove = rootMoves.Find(move);
+
+                if (rootMove is null)
+                    continue;
+
+                rootMove.Score = sortingScore--;
+            }
+
+            rootMoves.Sort(0);
+        }
+
         private int RootSearch(Span<SearchStack> stack, int alpha, int beta, int depth)
         {
             //Check if the alpha and beta values are within acceptable values
-            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(-InfiniteScore <= alpha);
             Debug.Assert(alpha < beta);
-            Debug.Assert(beta <= Infinite);
+            Debug.Assert(beta <= InfiniteScore);
 
             //Check to see if depth values are in allowed range
             Debug.Assert(depth > 0 && depth < MAX_DEPTH);
 
-            int score = -Infinite;
-            int evaluation = -Infinite;
+            int score = -InfiniteScore;
+            int evaluation = -InfiniteScore;
             Span<Move> childPv = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[0];
             bool inCheck = stack[0].inCheck = position.IsCheck();
@@ -175,7 +224,7 @@ namespace Chessour.Search
             selectiveDepth = 1;
 
             if (inCheck)
-                evaluation = stack[0].evaluation = -Infinite;
+                evaluation = stack[0].evaluation = -InfiniteScore;
             else
                 evaluation = stack[0].evaluation = Evaluate(position);
 
@@ -190,18 +239,33 @@ namespace Chessour.Search
                 bool givesCheck = position.GivesCheck(move);
                 bool isCapture = position.IsCapture(move);
 
+                if(Timer.Elapsed() > 3000)
+                    Console.WriteLine($"info depth {depth} currmove {UCI.Move(move)} currmovenumber {moveCount}");
+
                 int newDepth = depth - 1;
 
-                newDepth += Extensions(givesCheck);
+                newDepth += Extensions(depth, givesCheck);
 
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                if (moveCount > 1)
-                {
-                    int R = Reductions(moveCount, piece, givesCheck, isCapture);
+                int reduction = Reductions(moveCount, depth);
 
-                    score = -ZWSearch(stack, 1, -(alpha + 1), newDepth - R);
+                //LMR
+                if (depth > 2
+                    && moveCount > 1
+                    && (!isCapture))
+                {
+                    score = -ZWSearch(stack, 1, -(alpha + 1), newDepth - reduction);
+
+                    if (score > alpha)
+                    {
+                        score = -ZWSearch(stack, 1, -(alpha + 1), newDepth);
+                    }
+                }
+                else if (moveCount > 1)
+                {
+                    score = -ZWSearch(stack, 1, -(alpha + 1), newDepth);
                 }
 
                 if (moveCount == 1 || (score > alpha))
@@ -220,6 +284,8 @@ namespace Chessour.Search
                     rootMove.Score = rootMove.UCIScore = score;
                     rootMove.SelectiveDepth = selectiveDepth;
 
+                    rootMove.AvarageScore = rootMove.AvarageScore != -InfiniteScore ? (rootMove.AvarageScore + score) / 2
+                                                                                    : score;
                     rootMove.BoundLower = rootMove.BoundUpper = false;
 
                     if (score >= beta)
@@ -245,14 +311,14 @@ namespace Chessour.Search
                     }
                 }
                 else
-                    rootMove.Score = -Infinite;
+                    rootMove.Score = -InfiniteScore;
 
                 if (score > alpha)
-                {                 
+                {
+                    alpha = score;
+
                     if (alpha >= beta) //Fail high which means we need to research with a bigger aspiration window
                         break;
-                    else
-                        alpha = score; //In root node previous best score is alpha
 
                     if (depth > 1
                         && depth < 6
@@ -274,15 +340,15 @@ namespace Chessour.Search
                 return QuiescenceSearch(true, stack, ply, alpha, beta, 0, pv);
 
             //Check if the alpha and beta values are within acceptable values
-            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(-InfiniteScore <= alpha);
             Debug.Assert(alpha < beta);
-            Debug.Assert(beta <= Infinite);
+            Debug.Assert(beta <= InfiniteScore);
 
             //Check to see if depth values are in allowed range
             Debug.Assert(depth > 0 && depth < MAX_DEPTH);
 
-            int score = -Infinite;
-            int bestScore = -Infinite;
+            int score = -InfiniteScore;
+            int bestScore = -InfiniteScore;
             Move bestMove = Move.None;
             Span<Move> childPv = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[ply];
@@ -293,20 +359,20 @@ namespace Chessour.Search
             CheckTime();
 
             if (Stop || position.IsDraw())
-                return DrawValue;
+                return DrawScore;
 
             if (position.FiftyMoveCounter >= 3
-                && alpha < DrawValue
+                && alpha < DrawScore
                 && position.HasRepeated(ply))
             {
-                alpha = DrawValue;
+                alpha = DrawScore;
 
                 if (alpha >= beta)
                     return alpha;
             }
 
             if (ply >= MAX_PLY)
-                return inCheck ? DrawValue : Evaluate(position);
+                return inCheck ? DrawScore : Evaluate(position);
 
             //Mate distance pruning
             alpha = Math.Max(MatedIn(ply), alpha);
@@ -316,7 +382,7 @@ namespace Chessour.Search
 
             //Transposition table lookup
             Key positionKey = position.PositionKey;
-            ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
+            ref TranspositionTable.Entry ttentry = ref Engine.TranspositionTable.ProbeTable(positionKey, out bool ttHit);
             int ttScore = 0;
             Move ttMove = Move.None;
             bool ttCapture = false;
@@ -332,7 +398,7 @@ namespace Chessour.Search
             int evaluation = 0;
             if (inCheck)
             {
-                evaluation = stack[ply].evaluation = -Infinite;
+                evaluation = stack[ply].evaluation = -InfiniteScore;
             }
             else
             {
@@ -346,7 +412,7 @@ namespace Chessour.Search
                 }
             }
 
-            MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
             int moveCount = 0;
             int nextPly = ply + 1;
             foreach (Move move in movePicker)
@@ -363,16 +429,28 @@ namespace Chessour.Search
                 int newDepth = depth - 1;
 
                 if (ply < RootDepth * 2)
-                    newDepth += Extensions(givesCheck);
+                    newDepth += Extensions(depth, givesCheck);
                
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                if (moveCount > 1)
-                {
-                    int R = Reductions(moveCount, piece, givesCheck, isCapture);
+                int reduction = Reductions(moveCount, depth);
 
-                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
+                //LMR
+                if (depth > 2
+                    && moveCount > 1
+                    && (!isCapture))
+                {
+                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - reduction);
+                    
+                    if(score > alpha)
+                    {
+                        score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth);
+                    }
+                }
+                else if (moveCount > 1)
+                {
+                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth);
                 }
 
                 if (moveCount == 1 || (score > alpha))
@@ -386,7 +464,7 @@ namespace Chessour.Search
                 if (Stop)
                     return 0;
 
-                Debug.Assert(score > -Infinite && score < Infinite);
+                Debug.Assert(score > -InfiniteScore && score < InfiniteScore);
 
                 if (score > bestScore)
                 {
@@ -398,8 +476,12 @@ namespace Chessour.Search
 
                         UpdatePV(pv, move, childPv);
 
-                        if (score >= beta)
+                        if (score >= beta) //cutoff
+                        {
+                            if(!position.IsCapture(bestMove))
+                                butterflyTable.GetReference((int)position.ActiveColor, (int)move.OriginDestination()) += depth * depth;
                             break;
+                        }
                         else
                         {
                             alpha = score;
@@ -422,7 +504,7 @@ namespace Chessour.Search
                 Debug.Assert(MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length == 0);
 
                 bestScore = inCheck ? MatedIn(ply)
-                                    : DrawValue;
+                                    : DrawScore;
             }
 
             Bound boundType = bestScore >= beta ? Bound.Lower //If a beta cut-off happened then this node is valued higher then the current eval
@@ -443,15 +525,15 @@ namespace Chessour.Search
                 return QuiescenceSearch(false, stack, ply, alpha, beta);
 
             //Check if the alpha and beta values are within acceptable values
-            Debug.Assert(-Infinite <= alpha);
+            Debug.Assert(-InfiniteScore <= alpha);
             Debug.Assert(alpha < beta);
-            Debug.Assert(beta <= Infinite);
+            Debug.Assert(beta <= InfiniteScore);
 
             //Check to see if depth values are in allowed range
             Debug.Assert(depth > 0 && depth < MAX_DEPTH);
 
-            int score = -Infinite;
-            int bestScore = -Infinite;
+            int score = -InfiniteScore;
+            int bestScore = -InfiniteScore;
             Move bestMove = Move.None;
             Span<Move> childPv = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[ply];
@@ -460,20 +542,20 @@ namespace Chessour.Search
             CheckTime();
 
             if (Stop || position.IsDraw())
-                return DrawValue;
+                return DrawScore;
 
             if (position.FiftyMoveCounter >= 3
-                && alpha < DrawValue
+                && alpha < DrawScore
                 && position.HasRepeated(ply))
             {
-                alpha = DrawValue;
+                alpha = DrawScore;
 
                 if (alpha >= beta)
                     return alpha;
             }
 
             if (ply >= MAX_PLY)
-                return inCheck ? DrawValue : Evaluate(position);
+                return inCheck ? DrawScore : Evaluate(position);
 
             //Mate distance pruning
             alpha = Math.Max(MatedIn(ply), alpha);
@@ -483,7 +565,7 @@ namespace Chessour.Search
 
             //Transposition table lookup
             Key positionKey = position.PositionKey;
-            ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
+            ref TranspositionTable.Entry ttentry = ref Engine.TranspositionTable.ProbeTable(positionKey, out bool ttHit);
 
             stack[ply].ttHit = ttHit;
 
@@ -534,9 +616,9 @@ namespace Chessour.Search
                 }
             }
             else
-                evaluation = stack[ply].evaluation = -Infinite;
+                evaluation = stack[ply].evaluation = -InfiniteScore;
 
-            MovePicker movePicker = new(position, ttMove, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
             int moveCount = 0;
             int nextPly = ply + 1;
             foreach (Move move in movePicker)
@@ -553,21 +635,36 @@ namespace Chessour.Search
                 int newDepth = depth - 1;
 
                 if (ply < RootDepth * 2)
-                    newDepth += Extensions(givesCheck);
+                    newDepth += Extensions(depth, givesCheck);
 
                 NodeCount++;
                 position.MakeMove(move, state, givesCheck);
 
-                int R = Reductions(moveCount, piece, givesCheck, isCapture);
+                int reduction = Reductions(moveCount, depth);
 
-                score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - R);
+                //LMR
+                if (depth > 2
+                    && moveCount > 1
+                    && (!isCapture))
+                {
+                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth - reduction);
+
+                    if (score > alpha)
+                    {
+                        score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth);
+                    }
+                }
+                else 
+                {
+                    score = -ZWSearch(stack, nextPly, -(alpha + 1), newDepth);
+                }
 
                 position.Takeback(move);
 
                 if (Stop)
                     return 0;
 
-                Debug.Assert(score > -Infinite && score < Infinite);
+                Debug.Assert(score > -InfiniteScore && score < InfiniteScore);
 
                 if (score > bestScore)
                 {
@@ -577,8 +674,12 @@ namespace Chessour.Search
                     {
                         bestMove = move;
 
-                        if (score >= beta)
+                        if (score >= beta) //cutoff
+                        {
+                            if (!position.IsCapture(bestMove))
+                                butterflyTable.GetReference((int)position.ActiveColor, (int)move.OriginDestination()) += depth * depth;
                             break;
+                        }
                         else
                         {
                             alpha = score;
@@ -599,7 +700,7 @@ namespace Chessour.Search
             if (moveCount == 0)
             {
                 bestScore = inCheck ? MatedIn(ply)
-                                    : DrawValue;
+                                    : DrawScore;
             }
 
             ttentry.Save(positionKey, false, bestMove, depth,
@@ -612,7 +713,7 @@ namespace Chessour.Search
         private int QuiescenceSearch(bool pvNode, Span<SearchStack> stack, int ply, int alpha, int beta, int depth = 0, Span<Move> pv = default)
         {
             //Check if the alpha and beta values are within acceptable values
-            Debug.Assert(-Infinite <= alpha && alpha < beta && beta <= Infinite);
+            Debug.Assert(-InfiniteScore <= alpha && alpha < beta && beta <= InfiniteScore);
             //This is a pv node or we are in a aspiration search
             Debug.Assert(pvNode || alpha == beta - 1);
             //Depth is negative
@@ -621,15 +722,15 @@ namespace Chessour.Search
             //Check for aborted search or draws
             if (Stop
                 || position.IsDraw())
-                return DrawValue;
+                return DrawScore;
 
             //Check to see if this position repeated during search
             //If yes we can claim this position as Draw
             if (position.FiftyMoveCounter >= 3
-                && alpha < DrawValue
+                && alpha < DrawScore
                 && position.HasRepeated(ply))
             {
-                alpha = DrawValue;
+                alpha = DrawScore;
                 if (alpha >= beta)
                     return alpha;
             }
@@ -643,7 +744,7 @@ namespace Chessour.Search
 
             Span<Move> childPV = stackalloc Move[MAX_PLY];
             Position.StateInfo state = states[ply];
-            int bestValue = -Infinite;
+            int bestValue = -InfiniteScore;
             Move bestMove = Move.None;
             bool inCheck = stack[ply].inCheck = position.IsCheck();
 
@@ -653,14 +754,14 @@ namespace Chessour.Search
                 pv[0] = Move.None;
 
             if (ply >= MAX_PLY)
-                return inCheck ? DrawValue : Evaluate(position);
+                return inCheck ? DrawScore : Evaluate(position);
 
             int ttDepth = (inCheck || depth >= QSChecks) ? QSChecks : QSNoChecks;
 
 
             //Transposition table lookup
             Key positionKey = position.PositionKey;
-            ref TranspositionTable.Entry ttentry = ref TTTable.ProbeTable(positionKey, out bool ttHit);
+            ref TranspositionTable.Entry ttentry = ref Engine.TranspositionTable.ProbeTable(positionKey, out bool ttHit);
             int ttScore = 0;
             Move ttMove = Move.None;
             bool ttCapture = false;
@@ -684,7 +785,7 @@ namespace Chessour.Search
             if (inCheck)
             {
                 stack[ply].evaluation = 0;
-                bestValue = -Infinite;
+                bestValue = -InfiniteScore;
             }
             else
             {
@@ -714,7 +815,7 @@ namespace Chessour.Search
                     alpha = bestValue;
             }
 
-            MovePicker movePicker = new(position, ttMove, stack[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stack[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
             int moveCount = 0;
             foreach (Move move in movePicker)
             {
@@ -745,7 +846,7 @@ namespace Chessour.Search
                 if (Stop)
                     return 0;
 
-                Debug.Assert(-Infinite < score && score < Infinite);
+                Debug.Assert(-InfiniteScore < score && score < InfiniteScore);
 
                 if (score > bestValue)
                 {
@@ -778,32 +879,6 @@ namespace Chessour.Search
                                                                    : Bound.Upper, bestValue);
 
             return bestValue;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int Extensions(bool isCheck)
-        {
-            if (isCheck)
-                return 1;
-
-            return 0;
-        }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private int Reductions(int moveCount, Piece piece, bool givesCheck, bool isCapture)
-        {
-            if (givesCheck)
-                return 0;
-
-            if (piece.TypeOf() == PieceType.Pawn)
-                return 0;
-
-            int R = 0;
-
-            if (moveCount > 6)
-                R++;
-
-            return R;
         }
 
         private static void CheckTime()

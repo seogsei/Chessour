@@ -12,39 +12,41 @@ namespace Chessour.Search
             QSearchTT, QCaptureGenerate, QCapture
         }
 
-        public MovePicker(Position position, Move ttMove, Span<MoveScore> buffer)
+        private MovePicker(Stage stage, Position position, Move ttMove, ButterflyTable butterfly, Square refutationSquare, Span<MoveScore> buffer)
         {
-            this.buffer = buffer;
             this.position = position;
             this.ttMove = ttMove;
-            this.refutationSquare = Square.None;
-            pointer = end = 0;
-            stage = position.IsCheck() ? Stage.EvasionTT : Stage.MainTT;
-
-            if (ttMove == Move.None || !position.IsPseudoLegal(ttMove))
-                stage++;
-        }
-
-        public MovePicker(Position position, Move ttMove, Square refutationSquare, Span<MoveScore> buffer)
-        {
-            this.buffer = buffer;
-            this.position = position;
-            this.ttMove = ttMove;
+            this.butterfly = butterfly;
             this.refutationSquare = refutationSquare;
             pointer = end = 0;
-            stage = position.IsCheck() ? Stage.EvasionTT : Stage.QSearchTT;
+
+            this.stage = position.IsCheck() ? Stage.EvasionTT : stage;
             if (ttMove == Move.None || !position.IsPseudoLegal(ttMove))
-                stage++;
+                this.stage++;
+
+            this.buffer = buffer;
         }
 
-        private readonly Span<MoveScore> buffer;
-        private int pointer;
-        private int end;
+        //Constructor for main search
+        public MovePicker(Position position, Move ttMove, ButterflyTable butterfly, Span<MoveScore> buffer) 
+            : this(Stage.MainTT, position, ttMove, butterfly, Square.None, buffer) { }
+
+        //Constructor for quiescence search
+        public MovePicker(Position position, Move ttMove, ButterflyTable butterfly, Square refutationSquare, Span<MoveScore> buffer)
+            : this(Stage.QSearchTT, position, ttMove, butterfly, refutationSquare, buffer) { }
+        
         private Stage stage;
 
         private readonly Position position;
         private readonly Move ttMove;
         private readonly Square refutationSquare;
+        private readonly ButterflyTable butterfly;
+
+        private readonly Span<MoveScore> buffer;
+        private int pointer;
+        private int end;
+
+        private int badCaptureCounter;
 
         public Move Current { get; private set; }
         public MovePicker GetEnumerator() => this;
@@ -70,29 +72,38 @@ namespace Chessour.Search
                         ScoreCaptures();
                         InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
-                        break;
+                        continue;
                     case Stage.GoodCaptures:
-                        Current = FindNext();
+                        MoveScore move = FindNext();
+                        if (!position.StaticExchangeEvaluationGE(move))
+                        {
+                            buffer[badCaptureCounter++] = move;
+                            continue;
+                        }
+                        Current = move;
                         if (Current != Move.None)
                             return true;
                         stage++;
-                        break;
+                        continue;
                     case Stage.QuietGenerate:
                         end += MoveGenerators.Quiet.Generate(position, buffer[end..]).Length;
                         ScoreQuiets();
                         InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
-                        break;
+                        continue;
                     case Stage.Quiet:
                         Current = FindNext();
                         if (Current != Move.None)
                             return true;
-                        stage++;
-                        break;
+                        pointer = 0;
+                        stage++;                       
+                        continue;
                     case Stage.BadCaptures:
-                        Current = FindNext();
-                        if (Current != Move.None)
+                        if (pointer < badCaptureCounter)
+                        {
+                            Current = FindNext();
                             return true;
+                        }                       
                         return false;
 
                     case Stage.EvasionGenerate:
@@ -100,7 +111,7 @@ namespace Chessour.Search
                         ScoreEvasions();
                         InsertionSort.Sort(buffer[pointer..end]);
                         stage++;
-                        break;
+                        continue;
                     case Stage.Evasions:
                         Current = FindNext();
                         return Current != Move.None;
@@ -112,11 +123,11 @@ namespace Chessour.Search
             }
         }
 
-        private Move FindNext()
+        private MoveScore FindNext()
         {
             while (pointer < end)
             {
-                Move move = buffer[pointer++].Move;
+                MoveScore move = buffer[pointer++];
 
                 if (move != ttMove)
                     return move;
@@ -124,31 +135,76 @@ namespace Chessour.Search
                     continue;
             }
 
-            return Move.None;
+            return default;
         }
 
-        private void ScoreCaptures()
+        private readonly void ScoreCaptures()
         {
             for (int i = pointer; i < end; i++)
             {
                 Move move = buffer[i].Move;
-                buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()));                              
+                buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()));                          
             }
         }
 
-        private void ScoreQuiets()
+        private readonly void ScoreQuiets()
         {
+            Color us = position.ActiveColor;
+            Color enemy = us.Flip();
+
+            Bitboard pawnAttacks = position.AttacksBy(enemy, PieceType.Pawn);
+            Bitboard minorAttacks = position.AttacksBy(enemy, PieceType.Bishop) | position.AttacksBy(enemy, PieceType.Knight) | pawnAttacks;
+            Bitboard rookAttacks = position.AttacksBy(enemy, PieceType.Rook) | minorAttacks;
+
+            Bitboard piecesInDanger = 0;
+            piecesInDanger |= position.Pieces(us, PieceType.Queen) | rookAttacks;
+            piecesInDanger |= position.Pieces(us, PieceType.Rook) | minorAttacks;
+            piecesInDanger |= position.Pieces(us, PieceType.Bishop, PieceType.Knight) | pawnAttacks;
+
             for (int i = pointer; i < end; i++)
             {
-                Move move = buffer[i].Move;
-                Piece piece = position.PieceAt(move.OriginSquare());
-                buffer[i].Score = move.Type() == MoveType.Promotion ? Pieces.QueenValue
-                                                                    : PSQT.Get(piece, move.DestinationSquare()).MidGame
-                                                                    - PSQT.Get(piece, move.OriginSquare()).MidGame;
+                ref var ptr = ref buffer[i];
+
+                Piece piece = position.PieceAt(ptr.Move.OriginSquare());
+                PieceType pieceType = piece.TypeOf();
+
+                Square origin = ptr.Move.OriginSquare();
+                Square destination = ptr.Move.DestinationSquare();
+
+                int value = butterfly.Get((int)position.ActiveColor, ptr.Move.OriginDestination());
+
+                value += !piecesInDanger.Contains(origin) ? 0
+                                                          : pieceType switch
+                                                          {
+                                                              PieceType.Queen => 7500,
+                                                              PieceType.Rook => 5000,
+                                                              PieceType.Bishop or
+                                                              PieceType.Knight => 2500,
+                                                              _ => 0,
+                                                          };
+
+                value -= pieceType switch
+                {
+                    PieceType.Queen => !rookAttacks.Contains(destination)  ? 0
+                                     : !minorAttacks.Contains(destination) ? 5000
+                                     : !pawnAttacks.Contains(destination)  ? 10000
+                                                                           : 15000,
+                    PieceType.Rook => !minorAttacks.Contains(destination)  ? 0
+                                    : !pawnAttacks.Contains(destination)   ? 5000
+                                                                           : 10000,
+                    PieceType.Bishop or
+                    PieceType.Knight => !pawnAttacks.Contains(destination) ? 0
+                                                                           : 5000,
+                    _ => 0,
+                };
+
+                value += position.CheckSquares(pieceType).Contains(destination) ? 10000 : 0;
+
+                ptr.Score = value;
             }
         }
 
-        private void ScoreEvasions()
+        private readonly void ScoreEvasions()
         {
             //We want to search captures first after a check so we give them this 
             //huge bonus to move them up during sorting
@@ -159,14 +215,12 @@ namespace Chessour.Search
                 Move move = buffer[i].Move;
                 if (position.IsCapture(move))
                 {
-                    buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare())) + (evasionCaptureBonus);
+                    buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare())) 
+                                    + (evasionCaptureBonus);
                 }
                 else
                 {
-                    Piece piece = position.PieceAt(move.OriginSquare());
-                    buffer[i].Score = move.Type() == MoveType.Promotion ? Pieces.QueenValue
-                                                                        : PSQT.Get(piece, move.DestinationSquare()).MidGame
-                                                                        - PSQT.Get(piece, move.OriginSquare()).MidGame;
+                    buffer[i].Score = butterfly.Get((int)position.ActiveColor, move.OriginDestination());
                 }
             }
         }

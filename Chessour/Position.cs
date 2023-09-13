@@ -108,6 +108,20 @@ namespace Chessour
             return Pieces(color) & Pieces(pieceType1, pieceType2);
         }
 
+        public Bitboard AttacksBy(Color side, PieceType pieceType)
+        {
+            if(pieceType == Pawn)
+                return PawnAttackBitboard(side, Pieces(side, Pawn));
+
+            Bitboard attacks = 0;
+            Bitboard attackers = Pieces(side, pieceType);
+
+            foreach (Square square in attackers)
+                attacks |= Attacks(pieceType, square, Pieces());
+
+            return attacks;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Bitboard AttackersTo(Square square)
         {
@@ -308,7 +322,7 @@ namespace Chessour
                         || RookAttacks(rto, Pieces() ^ origin.ToBitboard() ^ destination.ToBitboard()).Contains(ksq);
 
                 default:
-                    Square capSq = MakeSquare(destination.GetFile(), origin.GetRank());
+                    Square capSq = SquareExtensions.MakeSquare(destination.GetFile(), origin.GetRank());
                     Bitboard b = (Pieces() ^ origin.ToBitboard() ^ capSq.ToBitboard()) | destination.ToBitboard();
 
                     return ((RookAttacks(ksq, b) & Pieces(us, Queen, Rook)) != 0)
@@ -422,13 +436,13 @@ namespace Chessour
                 for (File f = File.a; f <= File.h; f++)
                 {
                     int emptyCounter;
-                    for (emptyCounter = 0; f <= File.h && IsEmpty(MakeSquare(f, r)); f++)
+                    for (emptyCounter = 0; f <= File.h && IsEmpty(SquareExtensions.MakeSquare(f, r)); f++)
                         emptyCounter++;
                     if (emptyCounter > 0)
                         sb.Append(emptyCounter);
 
                     if (f <= File.h)
-                        sb.Append(" PNBRQK  pnbrqk"[(int)PieceAt(MakeSquare(f, r))]);
+                        sb.Append(" PNBRQK  pnbrqk"[(int)PieceAt(SquareExtensions.MakeSquare(f, r))]);
                 }
                 if (r > Rank.R1)
                     sb.Append('/');
@@ -547,7 +561,7 @@ namespace Chessour
                 File file = (File)(parts[3][0] - 'a');
                 Rank rank = (Rank)(parts[3][1] - '1');
 
-                state.epSquare = MakeSquare(file, rank);
+                state.epSquare = SquareExtensions.MakeSquare(file, rank);
             }
 
             state.fiftyMove = 0;
@@ -945,7 +959,7 @@ namespace Chessour
             for (Rank r = Rank.R8; r >= Rank.R1; r--)
             {
                 for (File f = File.a; f <= File.h; f++)
-                    sb.Append(" | ").Append(PieceAt(MakeSquare(f, r)).PieceToChar());
+                    sb.Append(" | ").Append(PieceAt(SquareExtensions.MakeSquare(f, r)).PieceToChar());
 
                 sb.Append(" | ").Append((int)(r + 1)).AppendLine();
                 sb.AppendLine(" +---+---+---+---+---+---+---+---+");

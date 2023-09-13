@@ -137,7 +137,7 @@ namespace Chessour.Search
                     Key = key;
                     Depth = depth;
                     Evaluation = evaluation;
-                    WriteExtras(Engine.TTTable.generation, isPV, boundType);
+                    WriteExtras(Engine.TranspositionTable.generation, isPV, boundType);
                 }
             }
         }

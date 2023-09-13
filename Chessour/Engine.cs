@@ -11,14 +11,14 @@ namespace Chessour
         {
             Threads = new(1);
 
-            TTTable = new(128);
+            TranspositionTable = new(128);
 
             Timer = new();
         }
 
         public static bool Stop { get; set; }
         public static ThreadPool Threads { get; private set; }
-        public static TranspositionTable TTTable { get; private set; }
+        public static TranspositionTable TranspositionTable { get; private set; }
         public static TimeManager Timer { get; private set; }
         public static UCI.GoParameters SearchLimits { get; private set; }
         public static bool Ponder { get; set; }
@@ -38,6 +38,16 @@ namespace Chessour
             Ponder = ponder;
 
             Threads.Master.Release();
+        }
+
+        internal static void NewGame()
+        {
+            Threads.Master.WaitForSearchFinish();
+
+            TranspositionTable.Clear();
+
+            foreach (var thread in Threads)
+                thread.Clear();
         }
     }
 }

@@ -290,6 +290,13 @@ namespace Chessour
             return pseudoAttack[(int)side][(int)square];
         }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Bitboard PawnAttackBitboard(Color side, Bitboard pawns)
+        {
+            return side == Color.White ? pawns.ShiftNorthEast() | pawns.ShiftNorthWest()
+                                        : pawns.ShiftSouthEast() | pawns.ShiftSouthWest();
+        }
+
         private struct MagicStruct
         {
             public Bitboard[] attacks;

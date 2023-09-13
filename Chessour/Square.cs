@@ -79,10 +79,6 @@
         public static Square RelativeTo(this Square square, Color side)
         {
             return side == Color.White ? square : square ^ Square.a8;
-
-            //This branchless implementation is better
-            //return square ^ (Square)(56 * (int)side);
-
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -95,6 +91,12 @@
         public static Square FlipFile(this Square square)
         {
             return square ^ Square.h1;
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Square MakeSquare(File file, Rank rank)
+        {
+            return (Square)(((int)rank << 3) + (int)file);
         }
     }
 }

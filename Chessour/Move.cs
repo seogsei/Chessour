@@ -16,7 +16,8 @@
     }
 
     /// <summary>
-    /// Single field structs are slower compared to enums in C# so for performance reasons we use an enum with extension methods
+    /// Single field structs are slower compared to enums in C#
+    /// so for performance reasons we use an enum with extension methods
     /// </summary>
     public static class MoveExtensions
     {
@@ -46,6 +47,10 @@
         {
             return (Square)((int)move >> 6) & Square.h8;
         }
+        public static int OriginDestination(this Move move)
+        {
+            return (int)move & 0xFFF;
+        }
         public static MoveType Type(this Move move)
         {
             return (MoveType)move & MoveType.Mask;
@@ -53,17 +58,6 @@
         public static PieceType PromotionPiece(this Move move)
         {
             return ((int)move >> 14) + PieceType.Knight;
-        }
-        public static string DebuggerDisplay(this Move move)
-        {
-            try
-            {
-                return UCI.Move(move);
-            }
-            catch
-            {
-                return "Invalid move: " + move;
-            }
         }
     }
 

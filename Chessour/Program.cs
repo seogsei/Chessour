@@ -1,4 +1,6 @@
-﻿namespace Chessour
+﻿using Chessour.Search;
+
+namespace Chessour
 {
     internal class Program
     {
