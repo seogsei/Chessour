@@ -49,7 +49,7 @@ namespace Chessour.Search
         private int badCaptureCounter;
 
         public Move Current { get; private set; }
-        public MovePicker GetEnumerator() => this;
+        public readonly MovePicker GetEnumerator() => this;
 
         public bool MoveNext()
         {
@@ -208,15 +208,15 @@ namespace Chessour.Search
         {
             //We want to search captures first after a check so we give them this 
             //huge bonus to move them up during sorting
-            const int evasionCaptureBonus = 4 * Pieces.QueenValue; 
+            const int evasionCaptureBonus = 10000; 
 
             for (int i = pointer; i < end; i++)
             {
                 Move move = buffer[i].Move;
                 if (position.IsCapture(move))
                 {
-                    buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare())) 
-                                    + (evasionCaptureBonus);
+                    buffer[i].Score = evasionCaptureBonus
+                                    - Pieces.PieceValue(position.PieceAt(move.OriginSquare()));
                 }
                 else
                 {
