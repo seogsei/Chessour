@@ -81,6 +81,11 @@ namespace Chessour.Search
                 Work();
             }
         }
+
+        internal void Clear()
+        {
+            searcher.ClearHistoryTables();
+        }
     }
 
     internal class MasterThread : Thread

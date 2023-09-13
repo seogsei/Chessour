@@ -20,14 +20,14 @@ namespace Chessour.Evaluation
 
         public const int Tempo = 40;
 
-        public static int MatedIn(int ply)
-        {
-            return -MateValue + ply;
-        }
-
         public static int MateIn(int ply)
         {
             return MateValue - ply;
+        }
+  
+        public static int MatedIn(int ply)
+        {
+            return -MateIn(ply);
         }
 
         public static double ToCentiPawn(int score)

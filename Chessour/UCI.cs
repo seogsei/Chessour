@@ -51,6 +51,7 @@ namespace Chessour
                         Console.WriteLine("readyok");
                         break;
                     case "ucinewgame":
+                        Engine.NewGame();
                         break;
                     case "position":
                         Position(ref ss);
@@ -226,7 +227,7 @@ namespace Chessour
             sb.Append(" score ").Append(Value(rootMove.UCIScore));
             sb.Append(" nodes ").Append(nodesSearched);
             sb.Append(" nps ").Append(nodesSearched * 1000 / timeElapsed);
-            sb.Append(" hashfull ").Append(Engine.TTTable.Hashfull());
+            sb.Append(" hashfull ").Append(Engine.TranspositionTable.Hashfull());
             sb.Append(" time ").Append(timeElapsed);
 
             sb.Append(" pv");
