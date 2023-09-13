@@ -7,22 +7,21 @@ namespace Chessour.Evaluation
 {
     public class Evaluator
     {
-        public const int DrawValue = 0;
+        public const int InfiniteScore = short.MaxValue;
+        public const int MateScore = InfiniteScore - 1;
+        public const int DrawScore = 0;
 
         public const int ExpectedWin = MateInMaxPly - 1;
         public const int ExpectedLoss = -ExpectedWin;
-
-        public const int MateValue = 32000;
-        public const int Infinite = 32001;
-
-        public const int MateInMaxPly = MateValue - DepthConstants.MAX_PLY;
+ 
+        public const int MateInMaxPly = MateScore - DepthConstants.MAX_PLY;
         public const int MatedInMaxPly = -MateInMaxPly;
 
-        public const int Tempo = 40;
+        public const int Tempo = Pieces.PawnValue / 4;
 
         public static int MateIn(int ply)
         {
-            return MateValue - ply;
+            return MateScore - ply;
         }
   
         public static int MatedIn(int ply)

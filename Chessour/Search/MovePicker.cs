@@ -138,7 +138,7 @@ namespace Chessour.Search
             return default;
         }
 
-        private void ScoreCaptures()
+        private readonly void ScoreCaptures()
         {
             for (int i = pointer; i < end; i++)
             {
@@ -147,16 +147,64 @@ namespace Chessour.Search
             }
         }
 
-        private void ScoreQuiets()
+        private readonly void ScoreQuiets()
         {
+            Color us = position.ActiveColor;
+            Color enemy = us.Flip();
+
+            Bitboard pawnAttacks = position.AttacksBy(enemy, PieceType.Pawn);
+            Bitboard minorAttacks = position.AttacksBy(enemy, PieceType.Bishop) | position.AttacksBy(enemy, PieceType.Knight) | pawnAttacks;
+            Bitboard rookAttacks = position.AttacksBy(enemy, PieceType.Rook) | minorAttacks;
+
+            Bitboard piecesInDanger = 0;
+            piecesInDanger |= position.Pieces(us, PieceType.Queen) | rookAttacks;
+            piecesInDanger |= position.Pieces(us, PieceType.Rook) | minorAttacks;
+            piecesInDanger |= position.Pieces(us, PieceType.Bishop, PieceType.Knight) | pawnAttacks;
+
             for (int i = pointer; i < end; i++)
             {
-                Move move = buffer[i].Move;
-                buffer[i].Score = butterfly.Get((int)position.ActiveColor, move.OriginDestination());
+                ref var ptr = ref buffer[i];
+
+                Piece piece = position.PieceAt(ptr.Move.OriginSquare());
+                PieceType pieceType = piece.TypeOf();
+
+                Square origin = ptr.Move.OriginSquare();
+                Square destination = ptr.Move.DestinationSquare();
+
+                int value = butterfly.Get((int)position.ActiveColor, ptr.Move.OriginDestination());
+
+                value += !piecesInDanger.Contains(origin) ? 0
+                                                          : pieceType switch
+                                                          {
+                                                              PieceType.Queen => 7500,
+                                                              PieceType.Rook => 5000,
+                                                              PieceType.Bishop or
+                                                              PieceType.Knight => 2500,
+                                                              _ => 0,
+                                                          };
+
+                value -= pieceType switch
+                {
+                    PieceType.Queen => !rookAttacks.Contains(destination)  ? 0
+                                     : !minorAttacks.Contains(destination) ? 5000
+                                     : !pawnAttacks.Contains(destination)  ? 10000
+                                                                           : 15000,
+                    PieceType.Rook => !minorAttacks.Contains(destination)  ? 0
+                                    : !pawnAttacks.Contains(destination)   ? 5000
+                                                                           : 10000,
+                    PieceType.Bishop or
+                    PieceType.Knight => !pawnAttacks.Contains(destination) ? 0
+                                                                           : 5000,
+                    _ => 0,
+                };
+
+                value += position.CheckSquares(pieceType).Contains(destination) ? 10000 : 0;
+
+                ptr.Score = value;
             }
         }
 
-        private void ScoreEvasions()
+        private readonly void ScoreEvasions()
         {
             //We want to search captures first after a check so we give them this 
             //huge bonus to move them up during sorting

@@ -1,4 +1,5 @@
-﻿using Chessour.Utilities;
+﻿using Chessour.Evaluation;
+using Chessour.Utilities;
 using System.Collections.Generic;
 using System.Numerics;
 
@@ -14,6 +15,7 @@ namespace Chessour.Search
         public List<Move> PV { get; } = new(4);
         public int Score { get; set; }
         public int PreviousScore { get; set; }
+        public int AvarageScore { get; set; } = -Evaluator.InfiniteScore;
         public int UCIScore { get; set; }
         public bool BoundUpper { get; set; }
         public bool BoundLower { get; set; }

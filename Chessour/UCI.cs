@@ -253,7 +253,7 @@ namespace Chessour
         {
             if (Math.Abs(value) > Evaluator.MateInMaxPly)
             {
-                int mateDistance = (value > 0 ? Evaluator.MateValue - value + 1 : -Evaluator.MateValue - value) / 2;
+                int mateDistance = (value > 0 ? Evaluator.MateScore - value + 1 : -Evaluator.MateScore - value) / 2;
                 return "mate " + mateDistance;
             }
             else
@@ -273,7 +273,7 @@ namespace Chessour
             MoveType type = move.Type();
 
             if (type == MoveType.Castling)
-                destination = MakeSquare(destination > origin ? File.g : File.c, origin.GetRank());
+                destination = SquareExtensions.MakeSquare(destination > origin ? File.g : File.c, origin.GetRank());
 
             string moveString = string.Concat(origin, destination);
             if (type == MoveType.Promotion)

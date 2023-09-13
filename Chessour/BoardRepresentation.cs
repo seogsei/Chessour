@@ -9,15 +9,9 @@
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Square MakeSquare(File file, Rank rank)
+        public static CastlingRight MakeCastlingRight(Color side, CastlingRight castlingRight)
         {
-            return (Square)(((int)rank << 3) + (int)file);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static CastlingRight MakeCastlingRight(Color side, CastlingRight cr)
-        {
-            return (side == Color.White ? CastlingRight.WhiteSide : CastlingRight.BlackSide) & cr;
+            return (side == Color.Black ? CastlingRight.BlackSide : CastlingRight.WhiteSide) & castlingRight;
         }
     }
 }
