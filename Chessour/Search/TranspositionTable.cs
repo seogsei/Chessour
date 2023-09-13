@@ -10,7 +10,7 @@ namespace Chessour.Search
         Exact = Upper | Lower,
     }
 
-    internal class TranspositionTable
+    internal sealed class TranspositionTable
     {
         public TranspositionTable(uint initialSizeInMB = 128)
         {
@@ -42,10 +42,9 @@ namespace Chessour.Search
             Engine.Threads.WaitForSearchFinish();
 
             nuint entryCount = (nuint)(sizeInMB * 1024 * 1024 / sizeof(Entry));
-
             //Round the size to next smaller power of two for hashing reasons
-            entryCount = BitOperations.RoundUpToPowerOf2(entryCount / 2);
-
+            entryCount = BitOperations.IsPow2(entryCount) ? entryCount
+                                                          : BitOperations.RoundUpToPowerOf2(entryCount / 2);
             array = new Entry[entryCount];
         }
 
