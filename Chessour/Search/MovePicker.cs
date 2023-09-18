@@ -3,7 +3,7 @@ using Chessour.Utilities;
 
 namespace Chessour.Search
 {
-    internal ref struct MovePicker
+    public ref struct MovePicker
     {
         private enum Stage
         {
