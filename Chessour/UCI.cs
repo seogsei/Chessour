@@ -3,27 +3,17 @@ using Chessour.Search;
 using Chessour.Utilities;
 using System.Collections.Generic;
 using System.Text;
-using static Chessour.Factory;
 
 namespace Chessour
 {
-    public class UCI
+    public static class UCI
     {
-        internal const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+        public const string StartFEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-        public bool Debug { get; private set; }
-
-        private readonly Position position;
-        private readonly Position.StateInfo rootState;
-
-        public UCI()
+        public static void Loop(string[] args)
         {
-            rootState = new();
-            position = new(StartFEN, rootState);
-        }
+            Position position = new(StartFEN, new());
 
-        public void Run(string[] args)
-        {
             string command;
             do
             {
@@ -39,7 +29,7 @@ namespace Chessour
                         Engine.Stop = true;
                         break;
                     case "ponderhit":
-                        Engine.Ponder = false;
+                        Engine.PonderMode = false;
                         break;
                     case "uci":
                         Identify();
@@ -54,19 +44,19 @@ namespace Chessour
                         Engine.NewGame();
                         break;
                     case "position":
-                        Position(ref ss);
+                        Position(ref ss, position);
                         break;
                     case "go":
-                        Go(ref ss);
+                        Go(ref ss, position);
                         break;
                     case "bench":
-                        Bench(ref ss);
+                        Bench(ref ss, position);
                         break;
                     case "d":
                         Console.WriteLine(position);
                         break;
                     case "eval":
-                        ShowEvaluation();
+                        ShowEvaluation(position);
                         break;
 
                     default:
@@ -77,7 +67,7 @@ namespace Chessour
             } while (command != "quit" && args.Length == 0);
         }
 
-        private void Position(ref StringStream ss)
+        private static void Position(ref StringStream ss, Position position)
         {
             ss.Extract(out string token);
 
@@ -105,11 +95,11 @@ namespace Chessour
             }
         }
 
-        private void Go(ref StringStream ss)
+        private static void Go(ref StringStream ss, Position position)
         {
             GoParameters limits = new()
             {
-                StartTime = TimeManager.Now()
+                startTime = TimeManager.Now()
             };
 
             bool ponder = false;
@@ -118,52 +108,52 @@ namespace Chessour
                 switch (token)
                 {
                     case "searchmoves":
-                        limits.Moves = new();
+                        limits.moves = new();
                         while (ss.Extract(out token))
-                            limits.Moves.Add(ParseMove(position, token));
+                            limits.moves.Add(ParseMove(position, token));
                         break;
                     case "ponder":
                         ponder = true;
                         break;
                     case "wtime":
-                        ss.Extract(out limits.WhiteTime);
+                        limits.whiteTime = TimeSpan.FromMilliseconds(ss.ReadInt64());
                         break;
                     case "btime":
-                        ss.Extract(out limits.BlackTime);
+                        limits.blackTime = TimeSpan.FromMilliseconds(ss.ReadInt64());
                         break;
                     case "winc":
-                        ss.Extract(out limits.WhiteIncrement);
+                        limits.whiteIncrement = TimeSpan.FromMilliseconds(ss.ReadInt64());
                         break;
                     case "binc":
-                        ss.Extract(out limits.BlackIncrement);
+                        limits.blackIncrement = TimeSpan.FromMilliseconds(ss.ReadInt64());
                         break;
                     case "movestogo":
-                        ss.Extract(out limits.MovesToGo);
+                        ss.Extract(out limits.movesToGo);
                         break;
                     case "depth":
-                        ss.Extract(out limits.Depth);
+                        ss.Extract(out limits.depth);
                         break;
                     case "nodes":
-                        ss.Extract(out limits.Nodes);
+                        ss.Extract(out limits.nodes);
                         break;
                     case "mate":
-                        ss.Extract(out limits.Mate);
+                        ss.Extract(out limits.mate);
                         break;
                     case "movetime":
-                        ss.Extract(out limits.MoveTime);
+                        ss.Extract(out limits.moveTime);
                         break;
                     case "infinite":
-                        limits.Infinite = true;
+                        limits.infinite = true;
                         break;
                     case "perft":
-                        ss.Extract(out limits.Perft);
+                        ss.Extract(out limits.perft);
                         break;
                 }
 
             Engine.StartThinking(position, limits, ponder);
         }
 
-        private void ShowEvaluation()
+        private static void ShowEvaluation(Position position)
         {
             Evaluator.Trace trace = new();
 
@@ -172,7 +162,7 @@ namespace Chessour
             Console.WriteLine(trace);
         }
 
-        private void Bench(ref StringStream ss)
+        private static void Bench(ref StringStream ss, Position position)
         {
             Stopwatch timer = new();
             timer.Start();
@@ -184,7 +174,7 @@ namespace Chessour
             {
                 Console.WriteLine($"\nPosition ({position.FEN()})");
 
-                Go(ref ss);
+                Go(ref ss, position);
 
                 Engine.Threads.WaitForSearchFinish();
                 nodes += Engine.Threads.TotalNodesSearched();
@@ -200,7 +190,7 @@ namespace Chessour
                 """);
         }
 
-        private void SetOption(ref StringStream ss)
+        private static void SetOption(ref StringStream ss)
         {
 
         }
@@ -220,15 +210,15 @@ namespace Chessour
 
             var rootMove = searcher.rootMoves[0];
             var nodesSearched = Engine.Threads.TotalNodesSearched();
-            var timeElapsed = Engine.Timer.Elapsed() + 1;
+            var timeElapsed = Engine.Timer.Elapsed();
 
             sb.Append("info depth ").Append(depth);
             sb.Append(" seldepth ").Append(rootMove.SelectiveDepth);
             sb.Append(" score ").Append(Value(rootMove.UCIScore));
             sb.Append(" nodes ").Append(nodesSearched);
-            sb.Append(" nps ").Append(nodesSearched * 1000 / timeElapsed);
+            sb.Append(" nps ").Append((long)(nodesSearched / timeElapsed.TotalSeconds));
             sb.Append(" hashfull ").Append(Engine.TranspositionTable.Hashfull());
-            sb.Append(" time ").Append(timeElapsed);
+            sb.Append(" time ").Append((long)timeElapsed.TotalMilliseconds);
 
             sb.Append(" pv");
 
@@ -282,30 +272,30 @@ namespace Chessour
             return moveString;
         }
 
-        internal struct GoParameters
+        internal class GoParameters
         {
-            public int Perft;
+            public int perft;
 
-            public List<Move>? Moves;
+            public List<Move>? moves;
 
-            public long StartTime;
+            public DateTime startTime;
 
-            public long WhiteTime;
-            public long BlackTime;
-            public long WhiteIncrement;
-            public long BlackIncrement;
-            public long MoveTime;
-            public int MovesToGo;
+            public TimeSpan whiteTime;
+            public TimeSpan blackTime;
+            public TimeSpan whiteIncrement;
+            public TimeSpan blackIncrement;
+            public long moveTime;
+            public int movesToGo;
 
-            public int Mate;
-            public int Depth;
-            public long Nodes;
+            public int mate;
+            public int depth;
+            public long nodes;
 
-            public bool Infinite;
+            public bool infinite;
 
             public bool RequiresTimeManagement()
             {
-                return WhiteTime != 0 || BlackTime != 0;
+                return whiteTime != TimeSpan.Zero || whiteTime != TimeSpan.Zero;
             }
         }
     }

@@ -97,9 +97,9 @@ namespace Chessour.Search
 
         public override void Work()
         {
-            if (Engine.SearchLimits.Perft > 0)
+            if (Engine.SearchLimits.perft > 0)
             {
-                searcher.Perft(Engine.SearchLimits.Perft);
+                searcher.Perft(Engine.SearchLimits.perft);
                 Console.WriteLine($"Nodes searched : {searcher.NodeCount}");
                 return;
             }
@@ -112,7 +112,7 @@ namespace Chessour.Search
             base.Work();
 
             //Wait for a stop or ponderhit command
-            if (!Engine.Stop && (Engine.Ponder || Engine.SearchLimits.Infinite)) { }
+            if (!Engine.Stop && (Engine.PonderMode || Engine.SearchLimits.infinite)) { }
 
             //Stop the threads
             Engine.Stop = true;

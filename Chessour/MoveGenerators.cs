@@ -8,7 +8,7 @@ namespace Chessour
 {
     public static class MoveGenerators
     {
-        public const int MAX_MOVE_COUNT = 256;
+        public const int MaxMoveCount = 256;
 
         public static class Legal
         {

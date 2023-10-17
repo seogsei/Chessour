@@ -203,8 +203,8 @@ namespace Chessour
 
             if (move.Type() != MoveType.Quiet)
             {
-                var moves = IsCheck() ? MoveGenerators.Evasion.Generate(this, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT])
-                                        : MoveGenerators.NonEvasion.Generate(this, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+                var moves = IsCheck() ? MoveGenerators.Evasion.Generate(this, stackalloc MoveScore[MoveGenerators.MaxMoveCount])
+                                        : MoveGenerators.NonEvasion.Generate(this, stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
 
                 foreach (var candMove in moves)
                     if (move == candMove.Move)

@@ -21,7 +21,7 @@ namespace Chessour
         public static TranspositionTable TranspositionTable { get; private set; }
         public static TimeManager Timer { get; private set; }
         public static UCI.GoParameters SearchLimits { get; private set; }
-        public static bool Ponder { get; set; }
+        public static bool PonderMode { get; set; }
 
         public static void StartThinking(Position position, in UCI.GoParameters limits, bool ponder)
         {
@@ -33,9 +33,9 @@ namespace Chessour
             Timer.Initialize(position.ActiveColor, limits);
 
             foreach (var thread in Threads)
-                thread.searcher.SetSearchParameters(position, limits.Moves);
+                thread.searcher.SetSearchParameters(position, limits.moves);
 
-            Ponder = ponder;
+            PonderMode = ponder;
 
             Threads.Master.Release();
         }

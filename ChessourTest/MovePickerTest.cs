@@ -28,7 +28,7 @@ namespace ChessourTest
                 moveCount++;
             }
 
-            int expectedMoveCount = MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length;
+            int expectedMoveCount = MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MaxMoveCount]).Length;
 
             Assert.AreEqual(expectedMoveCount, moveCount);
         }

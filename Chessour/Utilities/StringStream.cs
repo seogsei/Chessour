@@ -31,6 +31,7 @@
         {
             return int.TryParse(NextToken(), out result);
         }
+
         public bool Extract(out long result)
         {
             return long.TryParse(NextToken(), out result);
@@ -44,6 +45,12 @@
 
             result = str[position++];
             return true;
+        }
+
+        public long ReadInt64()
+        {
+            Extract(out long result);
+            return result;
         }
 
         public string ReadUntil(string limiter)

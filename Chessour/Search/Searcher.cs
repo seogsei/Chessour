@@ -91,7 +91,7 @@ namespace Chessour.Search
             long totalNodes = 0, branchNodes;
             var state = states[distance];
 
-            foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]))
+            foreach (Move move in MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MaxMoveCount]))
             {
                 if (depth == 1)
                     totalNodes += branchNodes = 1;
@@ -99,7 +99,7 @@ namespace Chessour.Search
                 else
                 {
                     position.MakeMove(move, state);
-                    branchNodes = depth == 2 ? MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length
+                    branchNodes = depth == 2 ? MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MaxMoveCount]).Length
                                              : Perft(depth - 1, distance + 1);
                     totalNodes += branchNodes;
                     position.Takeback(move);
@@ -127,7 +127,7 @@ namespace Chessour.Search
             int maxPvIdx = Math.Min(1, rootMoves.Count);
             while (++RootDepth < MaxDepth
                 && !Stop
-                && !(SearchLimits.Depth > 0 && RootDepth > SearchLimits.Depth))
+                && !(SearchLimits.depth > 0 && RootDepth > SearchLimits.depth))
             {
                 foreach (var rootMove in rootMoves)
                     rootMove.PreviousScore = rootMove.Score;
@@ -176,9 +176,9 @@ namespace Chessour.Search
                 if (!Stop)
                     completedDepth = RootDepth;
 
-                if (SearchLimits.Mate > 0
+                if (SearchLimits.mate > 0
                     && bestValue >= MateScore
-                    && MateScore - bestValue >= 2 * SearchLimits.Mate)
+                    && MateScore - bestValue >= 2 * SearchLimits.mate)
                     Stop = true;
 
                 if (SearchLimits.RequiresTimeManagement() && Timer.Elapsed() > Timer.OptimumTime)
@@ -239,7 +239,7 @@ namespace Chessour.Search
                 bool givesCheck = position.GivesCheck(move);
                 bool isCapture = position.IsCapture(move);
 
-                if(Timer.Elapsed() > 3000)
+                if(Timer.Elapsed() > TimeSpan.FromSeconds(3))
                     Console.WriteLine($"info depth {depth} currmove {UCI.Move(move)} currmovenumber {moveCount}");
 
                 int newDepth = depth - 1;
@@ -412,7 +412,7 @@ namespace Chessour.Search
                 }
             }
 
-            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
             int moveCount = 0;
             int nextPly = ply + 1;
             foreach (Move move in movePicker)
@@ -501,7 +501,7 @@ namespace Chessour.Search
             //If there is no legal moves in the position we are either mated or its stealmate
             if (moveCount == 0)
             {
-                Debug.Assert(MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]).Length == 0);
+                Debug.Assert(MoveGenerators.Legal.Generate(position, stackalloc MoveScore[MoveGenerators.MaxMoveCount]).Length == 0);
 
                 bestScore = inCheck ? MatedIn(ply)
                                     : DrawScore;
@@ -618,7 +618,7 @@ namespace Chessour.Search
             else
                 evaluation = stack[ply].evaluation = -InfiniteScore;
 
-            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
             int moveCount = 0;
             int nextPly = ply + 1;
             foreach (Move move in movePicker)
@@ -815,7 +815,7 @@ namespace Chessour.Search
                     alpha = bestValue;
             }
 
-            MovePicker movePicker = new(position, ttMove, butterflyTable, stack[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerators.MAX_MOVE_COUNT]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stack[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
             int moveCount = 0;
             foreach (Move move in movePicker)
             {
