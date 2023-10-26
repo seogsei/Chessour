@@ -1,7 +1,7 @@
 ﻿using Chessour.Search;
 using static Chessour.Bitboards;
 using static Chessour.Color;
-using static Chessour.MoveExtensions;
+//using static Chessour.MoveExtensions;
 using static Chessour.PieceType;
 
 namespace Chessour
@@ -76,18 +76,18 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(kingSide), MoveType.Castling);
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(queenSide), MoveType.Castling);
                 }
 
                 return buffer[..generated];
@@ -112,18 +112,18 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(kingSide), MoveType.Castling);
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(queenSide), MoveType.Castling);
                 }
 
                 return buffer[..generated];
@@ -132,10 +132,10 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GeneratePromotions(Square from, Square to, Span<MoveScore> buffer, int pointer)
             {
-                buffer[pointer++] = CreatePromotionMove(from, to, Queen);
-                buffer[pointer++] = CreatePromotionMove(from, to, Rook);
-                buffer[pointer++] = CreatePromotionMove(from, to, Bishop);
-                buffer[pointer++] = CreatePromotionMove(from, to, Knight);
+                buffer[pointer++] = new Move(from, to, Queen);
+                buffer[pointer++] = new Move(from, to, Rook);
+                buffer[pointer++] = new Move(from, to, Bishop);
+                buffer[pointer++] = new Move(from, to, Knight);
                 return pointer;
             }
 
@@ -163,10 +163,10 @@ namespace Chessour
                 Bitboard push2 = (push1 & RelativeRank3).ShiftNorth() & emptySquares;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -190,17 +190,17 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftNorthWest() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
                     Bitboard epCandidates = pawns & BlackPawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidates)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
 
                 return pointer;
@@ -230,10 +230,10 @@ namespace Chessour
                 Bitboard push2 = (push1 & RelativeRank3).ShiftSouth() & emptySquares;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -258,17 +258,17 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftSouthEast() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
                     Bitboard epCandidate = pawns & WhitePawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidate)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
 
                 return pointer;
@@ -308,7 +308,7 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 return buffer[..generated];
             }
@@ -336,7 +336,7 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & ~position.Pieces(Us);
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 return buffer[..generated];
             }
@@ -344,10 +344,10 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GeneratePromotions(Square from, Square to, Span<MoveScore> buffer, int pointer)
             {
-                buffer[pointer++] = CreatePromotionMove(from, to, Queen);
-                buffer[pointer++] = CreatePromotionMove(from, to, Rook);
-                buffer[pointer++] = CreatePromotionMove(from, to, Bishop);
-                buffer[pointer++] = CreatePromotionMove(from, to, Knight);
+                buffer[pointer++] = new Move(from, to, Queen);
+                buffer[pointer++] = new Move(from, to, Rook);
+                buffer[pointer++] = new Move(from, to, Bishop);
+                buffer[pointer++] = new Move(from, to, Knight);
                 return pointer;
             }
 
@@ -377,10 +377,10 @@ namespace Chessour
                 push2 &= targets;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -407,10 +407,10 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftNorthWest() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
@@ -420,7 +420,7 @@ namespace Chessour
                     Bitboard epCandidate = pawns & BlackPawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidate)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant); ;
                 }
 
                 return pointer;
@@ -452,10 +452,10 @@ namespace Chessour
                 push2 &= targets;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -482,10 +482,10 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftSouthEast() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
@@ -495,7 +495,7 @@ namespace Chessour
                     Bitboard epCandidate = pawns & WhitePawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidate)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant); ;
                 }
 
                 return pointer;
@@ -530,7 +530,7 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 return buffer[..generated];
             }
@@ -555,7 +555,7 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 return buffer[..generated];
             }
@@ -563,17 +563,17 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GeneratePromotions(Square from, Square to, Span<MoveScore> buffer, int pointer)
             {
-                buffer[pointer++] = CreatePromotionMove(from, to, Queen);
+                buffer[pointer++] = new Move(from, to, Queen);
                 return pointer;
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GenerateCapturePromotions(Square from, Square to, Span<MoveScore> buffer, int pointer)
             {
-                buffer[pointer++] = CreatePromotionMove(from, to, Queen);
-                buffer[pointer++] = CreatePromotionMove(from, to, Rook);
-                buffer[pointer++] = CreatePromotionMove(from, to, Bishop);
-                buffer[pointer++] = CreatePromotionMove(from, to, Knight);
+                buffer[pointer++] = new Move(from, to, Queen);
+                buffer[pointer++] = new Move(from, to, Rook);
+                buffer[pointer++] = new Move(from, to, Bishop);
+                buffer[pointer++] = new Move(from, to, Knight);
                 return pointer;
             }
 
@@ -617,17 +617,17 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftNorthWest() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
                     Bitboard epCandidates = pawns & BlackPawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidates)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
 
                 return pointer;
@@ -674,17 +674,17 @@ namespace Chessour
                 Bitboard captureLeft = pawns.ShiftSouthEast() & enemies;
 
                 foreach (Square to in captureRight)
-                    buffer[pointer++] = CreateMove(to - (int)UpRight, to);
+                    buffer[pointer++] = new Move(to - (int)UpRight, to);
 
                 foreach (Square to in captureLeft)
-                    buffer[pointer++] = CreateMove(to - (int)UpLeft, to);
+                    buffer[pointer++] = new Move(to - (int)UpLeft, to);
 
                 if (position.EnPassantSquare != Square.None)
                 {
                     Bitboard epCandidate = pawns & WhitePawnAttacks(position.EnPassantSquare);
 
                     foreach (Square from in epCandidate)
-                        buffer[pointer++] = CreateEnPassantMove(from, position.EnPassantSquare);
+                        buffer[pointer++] = new Move(from, position.EnPassantSquare, MoveType.EnPassant);
                 }
 
                 return pointer;
@@ -719,18 +719,18 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(kingSide), MoveType.Castling);
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(queenSide), MoveType.Castling);
                 }
 
                 return buffer[..generated];
@@ -755,18 +755,18 @@ namespace Chessour
                 Bitboard kingAttacks = KingAttacks(ksq) & targetSquares;
 
                 foreach (Square attack in kingAttacks)
-                    buffer[generated++] = CreateMove(ksq, attack);
+                    buffer[generated++] = new Move(ksq, attack);
 
                 CastlingRight ourSide = Us == White ? CastlingRight.WhiteSide : CastlingRight.BlackSide;
                 if (position.CanCastle(ourSide))
                 {
                     CastlingRight kingSide = ourSide & CastlingRight.KingSide;
                     if (position.CanCastle(kingSide) && !position.CastlingImpeded(kingSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(kingSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(kingSide), MoveType.Castling);
 
                     CastlingRight queenSide = ourSide & CastlingRight.QueenSide;
                     if (position.CanCastle(queenSide) && !position.CastlingImpeded(queenSide))
-                        buffer[generated++] = CreateCastlingMove(ksq, position.CastlingRookSquare(queenSide));
+                        buffer[generated++] = new Move(ksq, position.CastlingRookSquare(queenSide), MoveType.Castling);
                 }
 
                 return buffer[..generated];
@@ -775,9 +775,9 @@ namespace Chessour
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             private static int GeneratePromotions(Square from, Square to, Span<MoveScore> buffer, int pointer)
             {
-                buffer[pointer++] = CreatePromotionMove(from, to, Rook);
-                buffer[pointer++] = CreatePromotionMove(from, to, Bishop);
-                buffer[pointer++] = CreatePromotionMove(from, to, Knight);
+                buffer[pointer++] = new Move(from, to, Rook);
+                buffer[pointer++] = new Move(from, to, Bishop);
+                buffer[pointer++] = new Move(from, to, Knight);
                 return pointer;
             }
 
@@ -799,10 +799,10 @@ namespace Chessour
                 Bitboard push2 = (push1 & RelativeRank3).ShiftNorth() & emptySquares;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -834,10 +834,10 @@ namespace Chessour
                 Bitboard push2 = (push1 & RelativeRank3).ShiftSouth() & emptySquares;
 
                 foreach (Square to in push1)
-                    buffer[pointer++] = CreateMove(to - (int)Up, to);
+                    buffer[pointer++] = new Move(to - (int)Up, to);
 
                 foreach (Square to in push2)
-                    buffer[pointer++] = CreateMove(to - (int)(Up + (int)Up), to);
+                    buffer[pointer++] = new Move(to - (int)(Up + (int)Up), to);
 
                 //Promotions
                 if (promotionPawns != 0)
@@ -860,7 +860,7 @@ namespace Chessour
                 Bitboard attacks = KnightAttacks(pieceSquare) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -873,7 +873,7 @@ namespace Chessour
                 Bitboard attacks = KnightAttacks(pieceSquare) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -886,7 +886,7 @@ namespace Chessour
                 Bitboard attacks = BishopAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -899,7 +899,7 @@ namespace Chessour
                 Bitboard attacks = BishopAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -912,7 +912,7 @@ namespace Chessour
                 Bitboard attacks = RookAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -925,7 +925,7 @@ namespace Chessour
                 Bitboard attacks = RookAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -938,7 +938,7 @@ namespace Chessour
                 Bitboard attacks = QueenAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }
@@ -951,7 +951,7 @@ namespace Chessour
                 Bitboard attacks = QueenAttacks(pieceSquare, occupiedSquares) & targetSquares;
 
                 foreach (Square attackSquare in attacks)
-                    buffer[pointer++] = CreateMove(pieceSquare, attackSquare);
+                    buffer[pointer++] = new Move(pieceSquare, attackSquare);
             }
             return pointer;
         }

@@ -192,7 +192,7 @@ namespace Chessour
 
         private static void SetOption(ref StringStream ss)
         {
-
+            throw new NotImplementedException();
         }
 
         private static void Identify()

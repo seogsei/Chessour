@@ -88,33 +88,33 @@ namespace Chessour.Search
 
             public Key Key
             {
-                get => key64;
+                readonly get => key64;
                 private set => key64 = value;
             }
             public Move Move
             {
-                get => (Move)move16;
-                private set => move16 = (ushort)value;
+                readonly get => new(move16);
+                private set => move16 = (ushort)value.Value;
             }
             public int Depth
             {
-                get => depth8 + DepthConstants.TTOffset;
+                readonly get => depth8 + DepthConstants.TTOffset;
                 private set => depth8 = (byte)(value - DepthConstants.TTOffset);
             }
             public int Evaluation
             {
-                get => evaluation16;
+                readonly get => evaluation16;
                 private set => evaluation16 = (short)value;
             }
-            public Bound BoundType
+            public readonly Bound BoundType
             {
                 get => (Bound)(extras8 & 3);
             }
-            public bool IsPV
+            public readonly bool IsPV
             {
                 get => (extras8 & 4) != 0;
             }
-            public int Generation
+            public readonly int Generation
             {
                 get => extras8 >> 3;
             }
