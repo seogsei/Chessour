@@ -2,12 +2,18 @@
 
 namespace Chessour.Evaluation
 {
-    public readonly record struct ScoreTuple(int MidGame, int EndGame) 
+    public readonly struct ScoreTuple(int midGame, int endGame) 
         : IAdditionOperators<ScoreTuple, ScoreTuple, ScoreTuple>,
         IUnaryNegationOperators<ScoreTuple, ScoreTuple>,
         IMultiplyOperators<ScoreTuple, int, ScoreTuple>,
         IDivisionOperators<ScoreTuple, int, ScoreTuple>
     {
+        private readonly short midGame = (short)midGame;
+        private readonly short endGame = (short)endGame;
+
+        public int MidGame => midGame;
+        public int EndGame => endGame;
+
         public static ScoreTuple Zero { get; } = new();
 
         public static ScoreTuple operator +(ScoreTuple left, ScoreTuple right)
