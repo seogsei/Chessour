@@ -1,6 +1,4 @@
-﻿using System.Numerics;
-
-namespace Chessour
+﻿namespace Chessour
 {   
     public enum MoveType
     {
@@ -10,45 +8,45 @@ namespace Chessour
         Castling = 3 << 12,
     }
     
-    public readonly struct Move :
-         IEqualityOperators<Move, Move, bool>
+    public readonly struct Move
     {
         public int Value { get; }
 
-        public static readonly Move None = default;
+        public static Move None { get; } = new();
 
-        public static readonly Move Null = new(Square.b1, Square.b1);
+        public static Move Null { get; } = new(Square.b1, Square.b1);
 
         internal Move(int value)
         {
             Value = value;
         }
 
-        public Move(Square from, Square to)
+        public Move(Square origin, Square destination)
+            : this(((int)destination << 6) | (int)origin)
         {
-            Value = ((int)to << 6) | (int)from;
+           
         }
 
-        public Move(Square from, Square to, MoveType type)
+        public Move(Square origin, Square destination, MoveType moveType)
+            : this (origin, destination)
         {
-            Debug.Assert(type != MoveType.Promotion);
-
-            Value = (int)type | ((int)to << 6) | (int)from;
+            Debug.Assert(moveType != Chessour.MoveType.Promotion);
+            Value |= (int)moveType;
         }
 
-        public Move(Square from, Square to, PieceType promotionPiece)
+        public Move(Square origin, Square destination, PieceType promotionPiece)
+            : this(origin, destination)
         {
             Debug.Assert(promotionPiece >= PieceType.Knight && promotionPiece <= PieceType.Queen);
-
-            Value = ((promotionPiece - PieceType.Knight) << 14) | (int)MoveType.Promotion | ((int)to << 6) | (int)from;
+            Value |= ((promotionPiece - PieceType.Knight) << 14) | (int)Chessour.MoveType.Promotion;           
         }
 
-        public readonly Square OriginSquare()
+        public readonly Square Origin()
         {
             return (Square)Value & Square.h8;
         }
 
-        public readonly Square DestinationSquare()
+        public readonly Square Destination()
         {
             return (Square)(Value >> 6) & Square.h8;
         }
@@ -58,9 +56,9 @@ namespace Chessour
             return Value & 0xfff;
         }
 
-        public readonly MoveType Type()
+        public readonly MoveType MoveType()
         {
-            return (MoveType)Value & MoveType.Castling;
+            return (MoveType)Value & Chessour.MoveType.Castling;
         }
 
         public readonly PieceType PromotionPiece()
@@ -76,15 +74,15 @@ namespace Chessour
             if (this == Null)
                 return "0000";
 
-            Square from = this.OriginSquare();
-            Square to = this.DestinationSquare();
+            Square from = Origin();
+            Square to = Destination();
 
-            if (this.Type() == MoveType.Castling)
+            if (MoveType() == Chessour.MoveType.Castling)
                 to = SquareExtensions.MakeSquare(to > from ? File.g : File.c, from.GetRank());
 
             string moveString = string.Concat(from, to);
-            if (this.Type() == MoveType.Promotion)
-                moveString += " pnbrqk"[(int)this.PromotionPiece()];
+            if (MoveType() == Chessour.MoveType.Promotion)
+                moveString += " pnbrqk"[(int)PromotionPiece()];
 
             return moveString;
         }

@@ -27,7 +27,7 @@ namespace Chessour
                     for (int i = 0; i < end; i++)
                     {
                         Move move = buffer[i].Move;
-                        if ((move.OriginSquare() == ksq || move.Type() == MoveType.EnPassant)
+                        if ((move.Origin() == ksq || move.MoveType() == MoveType.EnPassant)
                             && !position.IsLegal(move))
                             buffer[i--] = buffer[--end];
                     }
@@ -38,7 +38,7 @@ namespace Chessour
                     {
                         Move move = buffer[i].Move;
 
-                        if ((pinnedPieces.Contains(move.OriginSquare()) || move.OriginSquare() == ksq || move.Type() == MoveType.EnPassant)
+                        if ((pinnedPieces.Contains(move.Origin()) || move.Origin() == ksq || move.MoveType() == MoveType.EnPassant)
                             && !position.IsLegal(move))
                             buffer[i--] = buffer[--end];
                     }

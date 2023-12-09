@@ -258,9 +258,9 @@ namespace Chessour
             if (move == Chessour.Move.Null)
                 return "0000";
 
-            Square origin = move.OriginSquare();
-            Square destination = move.DestinationSquare();
-            MoveType type = move.Type();
+            Square origin = move.Origin();
+            Square destination = move.Destination();
+            MoveType type = move.MoveType();
 
             if (type == MoveType.Castling)
                 destination = SquareExtensions.MakeSquare(destination > origin ? File.g : File.c, origin.GetRank());

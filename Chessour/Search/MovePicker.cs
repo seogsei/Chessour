@@ -143,7 +143,7 @@ namespace Chessour.Search
             for (int i = pointer; i < end; i++)
             {
                 Move move = buffer[i].Move;
-                buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.DestinationSquare()));                          
+                buffer[i].Score = Pieces.PieceValue(position.PieceAt(move.Destination()));                          
             }
         }
 
@@ -165,11 +165,11 @@ namespace Chessour.Search
             {
                 ref var ptr = ref buffer[i];
 
-                Piece piece = position.PieceAt(ptr.Move.OriginSquare());
+                Piece piece = position.PieceAt(ptr.Move.Origin());
                 PieceType pieceType = piece.TypeOf();
 
-                Square origin = ptr.Move.OriginSquare();
-                Square destination = ptr.Move.DestinationSquare();
+                Square origin = ptr.Move.Origin();
+                Square destination = ptr.Move.Destination();
 
                 int value = butterfly.Get((int)position.ActiveColor, ptr.Move.OriginDestination());
 
@@ -216,7 +216,7 @@ namespace Chessour.Search
                 if (position.IsCapture(move))
                 {
                     buffer[i].Score = evasionCaptureBonus
-                                    - Pieces.PieceValue(position.PieceAt(move.OriginSquare()));
+                                    - Pieces.PieceValue(position.PieceAt(move.Origin()));
                 }
                 else
                 {

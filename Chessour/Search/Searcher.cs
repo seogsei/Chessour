@@ -235,7 +235,7 @@ namespace Chessour.Search
 
                 moveCount++;
                 stack[0].currentMove = move;
-                Piece piece = position.PieceAt(move.OriginSquare());
+                Piece piece = position.PieceAt(move.Origin());
                 bool givesCheck = position.GivesCheck(move);
                 bool isCapture = position.IsCapture(move);
 
@@ -422,7 +422,7 @@ namespace Chessour.Search
 
                 moveCount++;
                 stack[ply].currentMove = move;
-                Piece piece = position.PieceAt(move.OriginSquare());
+                Piece piece = position.PieceAt(move.Origin());
                 bool givesCheck = position.GivesCheck(move);
                 bool isCapture = position.IsCapture(move);
 
@@ -628,7 +628,7 @@ namespace Chessour.Search
 
                 moveCount++;
                 stack[ply].currentMove = move;
-                Piece piece = position.PieceAt(move.OriginSquare());
+                Piece piece = position.PieceAt(move.Origin());
                 bool givesCheck = position.GivesCheck(move);
                 bool isCapture = position.IsCapture(move);
 
@@ -815,7 +815,7 @@ namespace Chessour.Search
                     alpha = bestValue;
             }
 
-            MovePicker movePicker = new(position, ttMove, butterflyTable, stack[ply - 1].currentMove.DestinationSquare(), stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
+            MovePicker movePicker = new(position, ttMove, butterflyTable, stack[ply - 1].currentMove.Destination(), stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
             int moveCount = 0;
             foreach (Move move in movePicker)
             {

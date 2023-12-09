@@ -191,17 +191,17 @@ namespace Chessour
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsCapture(Move move)
         {
-            return (!IsEmpty(move.DestinationSquare()) && move.Type() != MoveType.Castling) || move.Type() == MoveType.Promotion;
+            return (!IsEmpty(move.Destination()) && move.MoveType() != MoveType.Castling) || move.MoveType() == MoveType.Promotion;
         }
 
         public bool IsPseudoLegal(Move move)
         {
             Color us = ActiveColor;
-            Square from = move.OriginSquare();
-            Square to = move.DestinationSquare();
+            Square from = move.Origin();
+            Square to = move.Destination();
             Piece pc = PieceAt(from);
 
-            if (move.Type() != MoveType.Quiet)
+            if (move.MoveType() != MoveType.Quiet)
             {
                 var moves = IsCheck() ? MoveGenerators.Evasion.Generate(this, stackalloc MoveScore[MoveGenerators.MaxMoveCount])
                                         : MoveGenerators.NonEvasion.Generate(this, stackalloc MoveScore[MoveGenerators.MaxMoveCount]);
@@ -260,9 +260,9 @@ namespace Chessour
         {
             Color us = ActiveColor;
             Color enemy = us.Flip();
-            Square origin = move.OriginSquare();
-            Square destination = move.DestinationSquare();
-            MoveType type = move.Type();
+            Square origin = move.Origin();
+            Square destination = move.Destination();
+            MoveType type = move.MoveType();
 
             if (type == MoveType.EnPassant)
             {
@@ -297,8 +297,8 @@ namespace Chessour
             Color us = ActiveColor;
             Color enemy = us.Flip();
             Square ksq = KingSquare(enemy);
-            Square origin = move.OriginSquare();
-            Square destination = move.DestinationSquare();
+            Square origin = move.Origin();
+            Square destination = move.Destination();
 
             if (CheckSquares(PieceAt(origin).TypeOf()).Contains(destination))
                 return true;
@@ -307,10 +307,10 @@ namespace Chessour
                 && !Alligned(origin, destination, ksq))
                 return true;
 
-            if (move.Type() == MoveType.Quiet)
+            if (move.MoveType() == MoveType.Quiet)
                 return false;
 
-            switch (move.Type())
+            switch (move.MoveType())
             {
                 case MoveType.Promotion:
                     return Attacks(move.PromotionPiece(), destination, Pieces() ^ origin.ToBitboard()).Contains(ksq);
@@ -332,16 +332,16 @@ namespace Chessour
 
         public Piece MovedPiece(Move move)
         {
-            return PieceAt(move.OriginSquare());
+            return PieceAt(move.Origin());
         }
 
         public bool StaticExchangeEvaluationGE(Move move, int threshold = 0)
         {
-            if (move.Type() != MoveType.Quiet)
+            if (move.MoveType() != MoveType.Quiet)
                 return 0 >= threshold;
 
-            Square from = move.OriginSquare();
-            Square to = move.DestinationSquare();
+            Square from = move.Origin();
+            Square to = move.Destination();
 
             int swap = Evaluation.Pieces.PieceValue(PieceAt(to)) - threshold;
 
@@ -616,9 +616,9 @@ namespace Chessour
             state.pliesFromNull++;
             gamePly++;
 
-            Square origin = move.OriginSquare();
-            Square destination = move.DestinationSquare();
-            MoveType moveType = move.Type();
+            Square origin = move.Origin();
+            Square destination = move.Destination();
+            MoveType moveType = move.MoveType();
 
             Color us = ActiveColor;
             Color them = us.Flip();
@@ -773,9 +773,9 @@ namespace Chessour
         {
             activeColor = ActiveColor.Flip();
 
-            Square origin = move.OriginSquare();
-            Square destination = move.DestinationSquare();
-            MoveType type = move.Type();
+            Square origin = move.Origin();
+            Square destination = move.Destination();
+            MoveType type = move.MoveType();
 
             Color us = ActiveColor;
             Piece captured = state.captured;
