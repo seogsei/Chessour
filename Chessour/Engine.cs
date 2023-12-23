@@ -1,53 +1,48 @@
 ﻿using Chessour.Search;
 
-namespace Chessour
+namespace Chessour;
+
+internal static class Engine
 {
-    internal static class Engine
+    public const string Name = "Chessour";
+    public const string Author = "Muhammed Ikbal Yaman";
+
+    public static bool Stop { get; set; }
+    public static bool PonderMode { get; set; }
+    public static UCI.GoParameters SearchLimits { get; private set; }
+    public static ThreadPool Threads { get; } = new(1);
+    public static TranspositionTable TranspositionTable { get; } = new();
+    public static TimeManager Timer { get; } = new();
+
+    public static void Run(string[] args)
     {
-        public const string Name = "Chessour";
-        public const string Author = "Muhammed Ikbal Yaman";
+        UCI.Loop(args);
+    }
 
-        static Engine()
-        {
-            Threads = new(1);
+    public static void StartThinking(Position position, UCI.GoParameters limits, bool ponder)
+    {
+        Threads.Master.WaitForSearchFinish();
 
-            TranspositionTable = new(128);
+        Stop = false;
 
-            Timer = new();
-        }
+        SearchLimits = limits;
+        Timer.Initialize(position.ActiveColor, limits);
 
-        public static bool Stop { get; set; }
-        public static ThreadPool Threads { get; private set; }
-        public static TranspositionTable TranspositionTable { get; private set; }
-        public static TimeManager Timer { get; private set; }
-        public static UCI.GoParameters SearchLimits { get; private set; }
-        public static bool PonderMode { get; set; }
+        foreach (var thread in Threads)
+            thread.searcher.SetSearchParameters(position, limits.moves);
 
-        public static void StartThinking(Position position, in UCI.GoParameters limits, bool ponder)
-        {
-            Threads.Master.WaitForSearchFinish();
+        PonderMode = ponder;
 
-            Stop = false;
+        Threads.Master.Release();
+    }
 
-            SearchLimits = limits;
-            Timer.Initialize(position.ActiveColor, limits);
+    internal static void NewGame()
+    {
+        Threads.Master.WaitForSearchFinish();
 
-            foreach (var thread in Threads)
-                thread.searcher.SetSearchParameters(position, limits.moves);
+        TranspositionTable.Clear();
 
-            PonderMode = ponder;
-
-            Threads.Master.Release();
-        }
-
-        internal static void NewGame()
-        {
-            Threads.Master.WaitForSearchFinish();
-
-            TranspositionTable.Clear();
-
-            foreach (var thread in Threads)
-                thread.Clear();
-        }
+        foreach (var thread in Threads)
+            thread.Clear();
     }
 }

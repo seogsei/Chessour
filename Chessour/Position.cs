@@ -12,28 +12,29 @@ namespace Chessour
 {
     public sealed class Position
     {
-        //Square centric piece representation
-        private readonly Piece[] board = new Piece[(int)Square.NB];
+        public Position(string fen = FEN.StartPosition) : this(fen, new()) { }
+        public Position(StateInfo stateObject) : this(FEN.StartPosition, stateObject) { }
+        public Position(string fen, StateInfo stateObject)
+        {
+            Set(fen, stateObject);
 
-        //Bitboards
+            Debug.Assert(state is not null);
+        }
+
+        //Fields
+        private readonly Piece[] board = new Piece[(int)Square.NB];
         private Bitboard allPieces;
         private readonly Bitboard[] colorBitboards = new Bitboard[(int)Color.NB];
         private readonly Bitboard[] typeBitboards = new Bitboard[(int)PieceType.NB];
-
-        //Castling extras
         private readonly CastlingRight[] castlingRightMasks = new CastlingRight[(int)Square.NB];
         private readonly Square[] castlingRookSquares = new Square[(int)CastlingRight.NB];
         private readonly Bitboard[] castlingPaths = new Bitboard[(int)CastlingRight.NB];
         private StateInfo state;
-        private Color activeColor;
-        private ScoreTuple pSQScore;
-        private int phaseValue;
-        private int gamePly;
 
-        public Color ActiveColor { get => activeColor; }
-        public ScoreTuple PSQScore { get => pSQScore; }
-        public int PhaseValue { get => phaseValue; }
-        public int GamePly { get => gamePly; }
+        public Color ActiveColor { get; private set; }
+        public ScoreTuple PSQScore { get; private set; }
+        public int PhaseValue { get; private set; }
+        public int GamePly { get; private set; }
         public CastlingRight CastlingRights { get => state.castlingRights; }
         public Square EnPassantSquare { get => state.epSquare; }
         public int FiftyMoveCounter { get => state.fiftyMove; }
@@ -44,15 +45,6 @@ namespace Chessour
         public int Repetition { get => state.repetition; }
         public int FullMove { get => (GamePly / 2) + 1; }
 
-        public Position(string fen) : this(fen, new()) { }
-        public Position(StateInfo stateObject) : this(UCI.StartFEN, stateObject) { }
-
-        public Position(string fen, StateInfo stateObject)
-        {
-            Set(fen, stateObject);
-
-            Debug.Assert(state is not null);
-        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public bool IsEmpty(Square square)
@@ -113,9 +105,9 @@ namespace Chessour
             if(pieceType == Pawn)
                 return PawnAttackBitboard(side, Pieces(side, Pawn));
 
-            Bitboard attacks = 0;
             Bitboard attackers = Pieces(side, pieceType);
 
+            Bitboard attacks = 0;
             foreach (Square square in attackers)
                 attacks |= Attacks(pieceType, square, Pieces());
 
@@ -130,14 +122,12 @@ namespace Chessour
 
         public Bitboard AttackersTo(Square square, Bitboard occupancy)
         {
-            Bitboard attackers = 0;
-            attackers |= WhitePawnAttacks(square) & Pieces(Black, Pawn);
-            attackers |= BlackPawnAttacks(square) & Pieces(White, Pawn);
-            attackers |= KnightAttacks(square) & Pieces(Knight);
-            attackers |= BishopAttacks(square, occupancy) & Pieces(Queen, Bishop);
-            attackers |= RookAttacks(square, occupancy) & Pieces(Queen, Rook);
-            attackers |= KingAttacks(square) & Pieces(King);
-            return attackers;
+            return WhitePawnAttacks(square) & Pieces(Black, Pawn)
+                | BlackPawnAttacks(square) & Pieces(White, Pawn)
+                | KnightAttacks(square) & Pieces(Knight)
+                | BishopAttacks(square, occupancy) & Pieces(Queen, Bishop)
+                | RookAttacks(square, occupancy) & Pieces(Queen, Rook)
+                | KingAttacks(square) & Pieces(King);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -330,11 +320,6 @@ namespace Chessour
             }
         }
 
-        public Piece MovedPiece(Move move)
-        {
-            return PieceAt(move.Origin());
-        }
-
         public bool StaticExchangeEvaluationGE(Move move, int threshold = 0)
         {
             if (move.MoveType() != MoveType.Quiet)
@@ -427,7 +412,7 @@ namespace Chessour
             return result > 0;
         }
 
-        public string FEN()
+        public string ToFenString()
         {
             StringBuilder sb = new();
 
@@ -481,10 +466,10 @@ namespace Chessour
             Array.Copy(pos.castlingRookSquares, castlingRookSquares, castlingRookSquares.Length);
             Array.Copy(pos.castlingPaths, castlingPaths, castlingPaths.Length);
             state = pos.state;
-            activeColor = pos.activeColor;
-            gamePly = pos.gamePly;
-            phaseValue = pos.phaseValue;
-            pSQScore = pos.pSQScore;
+            ActiveColor = pos.ActiveColor;
+            GamePly = pos.GamePly;
+            PhaseValue = pos.PhaseValue;
+            PSQScore = pos.PSQScore;
         }
 
         public void Set(string fen, StateInfo newState)
@@ -522,9 +507,9 @@ namespace Chessour
             }
 
             //Active Color
-            activeColor = White;
+            ActiveColor = White;
             if (parts.Length > 1 && parts[1] == "b")
-                activeColor = Black;
+                ActiveColor = Black;
 
             //Castling Rights
             state.castlingRights = 0;
@@ -568,9 +553,9 @@ namespace Chessour
             if (parts.Length > 4 && int.TryParse(parts[4], out int fiftyMove))
                 state.fiftyMove = fiftyMove;
 
-            gamePly = 0;
+            GamePly = 0;
             if (parts.Length > 5 && int.TryParse(parts[5], out int moveCounter))
-                gamePly = Math.Max(2 * (moveCounter - 1), 0) + (ActiveColor == White ? 0 : 1);
+                GamePly = Math.Max(2 * (moveCounter - 1), 0) + (ActiveColor == White ? 0 : 1);
 
 
             state.positionKey = CalculatePositionKey();
@@ -581,10 +566,10 @@ namespace Chessour
 
         private void Reset()
         {
-            activeColor = default;
-            gamePly = default;
-            pSQScore = default;
-            phaseValue = default;
+            ActiveColor = default;
+            GamePly = default;
+            PSQScore = default;
+            PhaseValue = default;
             Array.Clear(board);
             allPieces = default;
             Array.Clear(typeBitboards);
@@ -614,7 +599,7 @@ namespace Chessour
 
             state.fiftyMove++;
             state.pliesFromNull++;
-            gamePly++;
+            GamePly++;
 
             Square origin = move.Origin();
             Square destination = move.Destination();
@@ -708,7 +693,7 @@ namespace Chessour
             state.captured = captured;
             state.checkers = givesCheck ? AttackersTo(KingSquare(them)) & Pieces(us) : 0;
 
-            activeColor = them;
+            ActiveColor = them;
             state.positionKey = key ^ Zobrist.SideKey();
 
             SetCheckInfo(state);
@@ -751,7 +736,7 @@ namespace Chessour
 
             state.pliesFromNull = 0;
             state.fiftyMove++;
-            gamePly++;
+            GamePly++;
 
             if (EnPassantSquare != Square.None)
             {
@@ -761,7 +746,7 @@ namespace Chessour
 
             state.captured = Piece.None;
 
-            activeColor = ActiveColor.Flip();
+            ActiveColor = ActiveColor.Flip();
             state.positionKey ^= Zobrist.SideKey();
 
             SetCheckInfo(state);
@@ -771,7 +756,7 @@ namespace Chessour
 
         public void Takeback(Move move)
         {
-            activeColor = ActiveColor.Flip();
+            ActiveColor = ActiveColor.Flip();
 
             Square origin = move.Origin();
             Square destination = move.Destination();
@@ -823,14 +808,14 @@ namespace Chessour
             //Go back to the previous state object
             state = state.previous!;
 
-            gamePly--;
+            GamePly--;
         }
 
         public void TakebackNullMove()
         {
             state = state.previous!;
-            activeColor = ActiveColor.Flip();
-            gamePly--;
+            ActiveColor = ActiveColor.Flip();
+            GamePly--;
         }
 
         //Did this position happen in this many moves?
@@ -915,8 +900,8 @@ namespace Chessour
             colorBitboards[(int)piece.ColorOf()] |= squareBB;
 
             board[(int)square] = piece;
-            pSQScore += PSQT.Get(piece, square);
-            phaseValue += Phase.PhaseValue(piece);
+            PSQScore += PSQT.Get(piece, square);
+            PhaseValue += Phase.PhaseValue(piece);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -931,8 +916,8 @@ namespace Chessour
 
 
             board[(int)square] = Piece.None;
-            pSQScore -= PSQT.Get(piece, square);
-            phaseValue -= Phase.PhaseValue(piece);
+            PSQScore -= PSQT.Get(piece, square);
+            PhaseValue -= Phase.PhaseValue(piece);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -947,7 +932,7 @@ namespace Chessour
 
             board[(int)from] = 0;
             board[(int)to] = piece;
-            pSQScore += PSQT.Get(piece, to) - PSQT.Get(piece, from);
+            PSQScore += PSQT.Get(piece, to) - PSQT.Get(piece, from);
         }
 
         public override string ToString()
@@ -968,7 +953,7 @@ namespace Chessour
             sb.AppendLine("   a   b   c   d   e   f   g   h");
             sb.AppendLine();
 
-            sb.Append("Fen: ").AppendLine(FEN());
+            sb.Append("Fen: ").AppendLine(ToFenString());
             sb.Append("Key: ").AppendLine(PositionKey.ToString("X"));
             sb.Append("Repetition: ").AppendLine(Repetition.ToString());
             return sb.ToString();
