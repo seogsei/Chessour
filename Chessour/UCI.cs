@@ -172,7 +172,7 @@ namespace Chessour
 
             if (token == "go")
             {
-                Console.WriteLine($"\nPosition ({position.FEN()})");
+                Console.WriteLine($"\nPosition ({position.ToFenString()})");
 
                 Go(ref ss, position);
 
